@@ -1,20 +1,34 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 
 class GA:
 
-    def __init__(self,population_size,seed=None,mutation_prob = 0.008):
-        self.population_size = population_size
+    def __init__(self,seed=None,mutation_prob = 0.001,elitism_percentage = 20):
+        #model_key_parameters
+        self.k_tournament_k = 0
+        self.population_size = 0.0
+        self.mutation_rate = mutation_prob
+        self.elistism = 5                        #Elitism rate as a percentage
+
+
         self.mean_objective = 0.0
         self.best_objective = 0.0
         self.mean_fitness_list = []
         self.best_fitness_list = [] 
-        self.mutation_rate = mutation_prob
+
+        #Random seed
         if seed is not None:
             np.random.seed(seed)    
         
         pass
+
+    def print_model_info(self):
+        
+       
+        print("------ Model key parameters -------")
+        print(f"\n Population size: {self.population_size} \n Mutation rate: {self.mutation_rate} \n  K_size: {self.k_tournament_k} \n")
 
     def set_distance_matrix(self,distance_matrix):
         '''
@@ -22,6 +36,9 @@ class GA:
         '''
         self.distance_matrix = self.check_inf(distance_matrix=distance_matrix,replace_value=100000)
         self.gen_size = len(distance_matrix)
+        #self.population_size = 2*self.gen_size
+        self.population_size = 2*self.gen_size
+        self.k_tournament_k = int((3/100)*self.population_size)
         #print(f"Distance matrix is {self.distance_matrix}")
         #print(f"Gen size is {self.gen_size}")
 
@@ -41,14 +58,18 @@ class GA:
         self.population = np.array([np.random.permutation(self.gen_size) for _ in range(self.population_size)])
         #print(f"Population shape --> {np.shape(self.population)} \n Population is : {self.population[1]}" )
         self.fitness = self.calculate_fitness(self.population)
+        self.print_model_info()
 
 
     def selection_k_tournament(self, num_individuals, k=3):
         # Step 1: Randomly choose k individuals for each tournament
         tournament_indices = np.random.choice(self.population_size, size=(num_individuals, k), replace=True)
+        #print(f"\n tournament indices: {tournament_indices}")
 
         # Step 2: Get the fitness scores of the selected individuals
         tournament_fitness = self.fitness[tournament_indices]
+        #print(f"\n Fitness of the tournament is : {tournament_fitness}")    
+        
 
         # Step 3: Get the index of the individual with the best fitness in each tournament
         best_indices_in_tournament = np.argmin(tournament_fitness, axis=1)
@@ -56,8 +77,40 @@ class GA:
         # Step 4: Use these indices to select the best individuals from each tournament
         best_selected_indices = tournament_indices[np.arange(num_individuals), best_indices_in_tournament]
 
-        # Step 5: Return the selected individuals
+        # Step 5: Return the selected individualsi
         return self.population[best_selected_indices]
+    
+    
+    #make me a function that will select the best individuals from the population based on the k_tournament, given talso the fitness of that population
+    def selection_k_tournament_population(self,num_individuals,population,fitness,k):
+        '''
+        - Select the best individuals from the population based on the k_tournament
+        '''
+        # Step 1: Randomly choose k individuals for each tournament
+        tournament_indices = np.random.choice(population.shape[0], size=(num_individuals, k), replace=True)
+        #print(f"\n tournament indices: {tournament_indices}")
+
+        # Step 2: Get the fitness scores of the selected individuals
+        tournament_fitness = fitness[tournament_indices]
+        #print(f"\n Fitness of the tournament is : {tournament_fitness}")    
+        
+
+        # Step 3: Get the index of the individual with the best fitness in each tournament
+        best_indices_in_tournament = np.argmin(tournament_fitness, axis=1)
+
+        # Step 4: Use these indices to select the best individuals from each tournament
+        best_selected_indices = tournament_indices[np.arange(num_individuals), best_indices_in_tournament]
+
+        #step 5 retrieve also teh fitness of the best individuals
+        best_selected_fitness = fitness[best_selected_indices]
+
+        # Step 5: Return the selected individuals and its fitness
+        return population[best_selected_indices],best_selected_fitness
+    
+        
+        
+
+
     
     
     def crossover_singlepoint_population(self, population):
@@ -149,8 +202,8 @@ class GA:
         
         return child1, child2
 
-   
-    
+
+
 
     def mutation_singlepoint_population(self, population):
         mutation_rate = self.mutation_rate
@@ -220,6 +273,59 @@ class GA:
         # Select the best individuals
         self.population = combined_population[best_indices]
         self.fitness = combined_fitness[best_indices]
+
+    #make me a elimnate population that will use my elitism percentage to keep the best individuals and the rest will be compute dvia a k_tournament fucntion 
+
+    def eliminate_population_elitism(self,population,offsprings):
+        '''
+        - Eliminate the population based on the elitism percentage. FOr the rest of the population use the k_tournament function
+        '''
+        #print(f"-----ELIMINATEWITH ELÑITISM FUNCTION-----")
+
+        # 1) Combine the original population with the offspring
+        combined_population = np.vstack((population, offsprings))
+
+        # 2) Calculate fitness for the combined population
+        fitness_scores = self.calculate_fitness(offsprings)
+        combined_fitness = np.hstack((self.fitness, fitness_scores))
+        #print(f"\n Combined population -> {combined_population} \n Combined fitness -> {combined_fitness}")
+       
+
+        # 3) Get the elite population based on the elitism percentage
+        elitism_size = int((self.elistism/100)*self.population_size)
+        best_indices = np.argsort(combined_fitness)[:elitism_size]
+        best_indv = combined_population[best_indices]
+        #print(f"\n Elite population -> {combined_population[best_indices]} \n Elite fitness -> {combined_fitness[best_indices]}")
+
+        # 4) Get the remaining population size
+        remaining_size = self.population_size - elitism_size
+        remaining_population = combined_population[np.argsort(combined_fitness)[elitism_size:]]
+        remaining_population_fitness = self.calculate_fitness(remaining_population)
+        #print(f"\n Remaining population -> {remaining_population} \n Remaining fitness -> {remaining_population_fitness}")	
+
+        
+
+        # 5) Select the best individuals from the remaining population based on the k_tournament
+        remaining_population_ordered, remaining_population_fitness_ordered = self.selection_k_tournament_population(num_individuals=remaining_size, population=remaining_population, fitness=remaining_population_fitness, k=3)
+
+
+        # Print the elite population and the remaining population ordered
+        #print(f"\n Elite population -> {best_indv} \n Remaining population ordered -> {remaining_population_ordered}")
+
+
+        self.population = np.vstack((best_indv,remaining_population_ordered))
+        self.fitness = self.calculate_fitness(self.population)
+        
+        
+        
+
+   
+
+        #print(f"---- END ELIMNATION ELITISM------")
+       
+
+        
+
       
 
 
@@ -228,15 +334,31 @@ class GA:
         '''
         - Calculate the fitness of the population
         '''
-        
+        '''
         num_individuals = population.shape[0]
         fitness = np.zeros(num_individuals)
-       
-
-
         for i in range(num_individuals):
             fitness[i] = np.sum(self.distance_matrix[population[i],np.roll(population[i],-1)])
         #print(f"Fitness shape --> {np.shape(fitness)} \n Fitness is : {fitness[1]}" )
+        '''
+
+        num_individuals = population.shape[0]
+
+        # Get the indices for the current and next cities
+        current_indices = population[:, :-1]
+        next_indices = population[:, 1:]
+        
+        # Calculate the distances between consecutive cities
+        distances = self.distance_matrix[current_indices, next_indices]
+        
+        # Sum the distances for each individual
+        fitness = np.sum(distances, axis=1)
+        
+        # Add the distance from the last city back to the first city
+        last_to_first_distances =self.distance_matrix[population[:, -1], population[:, 0]]
+        fitness += last_to_first_distances
+
+        
 
         
 
@@ -300,3 +422,57 @@ class GA:
         plt.legend()
         plt.grid()
         plt.show()
+
+
+    def plot_fitness_dynamic(self):
+        # Create a plotly figure
+        fig = go.Figure()
+
+        # Add the best fitness trace
+        fig.add_trace(go.Scatter(
+            x=list(range(len(self.best_fitness_list))),
+            y=self.best_fitness_list,
+            mode='lines+markers',
+            name='Best Distance',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        # Add the mean fitness trace
+        fig.add_trace(go.Scatter(
+            x=list(range(len(self.mean_fitness_list))),
+            y=self.mean_fitness_list,
+            mode='lines+markers',
+            name='Mean Distance',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        # Get the last iteration's best and mean fitness
+        last_best_fitness = self.best_fitness_list[-1]
+        last_mean_fitness = self.mean_fitness_list[-1]
+
+        # Add text annotation for the last iteration's fitness
+        fig.add_annotation(
+            x=len(self.best_fitness_list) - 1,
+            y=last_best_fitness,
+            text=f'Best: {last_best_fitness}<br>Mean: {last_mean_fitness}',
+            showarrow=True,
+            arrowhead=1,
+            ax=-10,
+            ay=-40,
+            bgcolor='white',
+            bordercolor='black'
+        )
+
+        # Set the title and axis labels
+        fig.update_layout(
+            title=f'Distance over Iterations with mutation rate {self.mutation_rate*100} %',
+            xaxis_title='Iterations',
+            yaxis_title='Distance',
+            legend=dict(x=0, y=1),
+            hovermode='x'
+        )
+
+        # Show the plot
+        fig.show()

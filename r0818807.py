@@ -3,7 +3,7 @@ import numpy as np
 from Evol_algorithm import GA
 
 # Modify the class name to match your student number.
-class r0123456:
+class r0818807:
 
 	def __init__(self):
 		self.reporter = Reporter.Reporter(self.__class__.__name__)
@@ -11,14 +11,14 @@ class r0123456:
 		
 
 	# The evolutionary algorithm's main loop
-	def optimize(self, filename,mutation_prob=0.008):
+	def optimize(self, filename,mutation_prob=0.01):
 		# Read distance matrix from file.		
 		file = open(filename)
 		distanceMatrix = np.loadtxt(file, delimiter=",")
 		file.close()
-		population_size = 100
+		
 
-		model = GA(population_size=population_size,mutation_prob=mutation_prob)
+		model = GA(mutation_prob=mutation_prob)
 		model.set_distance_matrix(distanceMatrix)
 		model.set_initialization()
 		
@@ -35,11 +35,12 @@ class r0123456:
 			'''
 			iterations += 1
 			#print(f"\n Iteration number {iterations}")
-			parents = model.selection_k_tournament(num_individuals=population_size,k=3)	
+			parents = model.selection_k_tournament(num_individuals=model.population_size, k=model.k_tournament_k)	
 			offspring = model.crossover_singlepoint_population(parents)
 			offspring_mutated = model.mutation_singlepoint_population(offspring)
 
 			model.eliminate_population(population=model.population, offsprings=offspring_mutated)
+			#model.eliminate_population_elitism(population=model.population, offsprings=offspring_mutated)
 			meanObjective, bestObjective , bestSolution  = model.calculate_information_iteration()
 			yourConvergenceTestsHere = False
 
@@ -55,7 +56,7 @@ class r0123456:
 			if timeLeft < 0:
 				break
 			'''
-		model.plot_fitness()
+		model.plot_fitness_dynamic()
 		# Your code here.
 		return 0
 	
