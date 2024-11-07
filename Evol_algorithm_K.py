@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import seaborn as sns
 
-
-class GA:
+class GA_K:
 
     def __init__(self,seed=None,mutation_prob = 0.001,elitism_percentage = 20):
         #model_key_parameters
@@ -25,8 +25,6 @@ class GA:
         pass
 
     def print_model_info(self):
-        
-       
         print("------ Model key parameters -------")
         print(f"\n Population size: {self.population_size} \n Mutation rate: {self.mutation_rate} \n  K_size: {self.k_tournament_k} \n")
 
@@ -42,13 +40,341 @@ class GA:
         #print(f"Distance matrix is {self.distance_matrix}")
         #print(f"Gen size is {self.gen_size}")
 
-    #make me a function that will get the distnace matrix and check if a vlue is inf, and if yes will replace it by a number given like 100000
+
+
+    def plot_distance_matrix(self):
+        plt.figure(figsize=(12, 10))
+        sns.heatmap(self.distance_matrix, cmap='viridis', annot=False, cbar=True)
+        plt.title('Distance Matrix Heatmap')
+        plt.xlabel('City Index')
+        plt.ylabel('City Index')
+        plt.show()
+
+    def set_known_locations(self, known_locations):
+        # Initialize the count of valid cities and set x_new coordinate
+        valid_cities = 1  # Start with the first city as valid (index 0)
+        x_new = 0  # Set x_new coordinate for new cities along x-axis
+
+        # Iterate to find exactly 3 valid cities based on the distance matrix
+        while valid_cities < 4:
+            # Calculate distances to the next potential city (valid_cities + 1)
+            r_from_first = self.distance_matrix[0, valid_cities]
+            if valid_cities > 1:
+                r_from_previous = self.distance_matrix[valid_cities - 1, valid_cities]
+            
+            # Skip if any distance is infinite
+            if np.isinf(r_from_first) or (valid_cities > 1 and np.isinf(r_from_previous)):
+                valid_cities += 1
+                continue
+            
+            # Calculate y-coordinate for the new city
+            y_set = known_locations[0][1]
+            y_new = y_set - np.sqrt(r_from_first**2 - (known_locations[0][0] - x_new)**2)
+
+            # Append new location to known_locations
+            known_locations = np.vstack((known_locations, [x_new, y_new]))
+            valid_cities += 1
+        
+        print(f"\n Known locations: {known_locations}")
+        self.known_cities = known_locations
+
+
+    def iterative_refinement(self,distance_matrix,circles_method = False):
+        
+
+        self.set_distance_matrix(distance_matrix=distance_matrix)
+        print(f"\nDistance matrix given:\n{self.distance_matrix}")
+        
+        known_locations = np.array([[0,0]])
+        self.set_known_locations(known_locations)
+
+        len_known = len(self.known_cities)
+        n = self.distance_matrix.shape[0]
+        coords = np.zeros((n, 2))
+        valid_indices = np.where(self.distance_matrix!= np.inf)[0]
+
+        
+        unknown_indices = np.arange(start=len_known,stop=n,step=1)
+        
+    
+        
+        print(f"\n Unknown indices: {unknown_indices}")
+
+        #calculate me the indices of cities taht we do now know yet
+        
+
+
+        
+
+           
+        
+            
+
+            
+
+        if circles_method:
+            for unknow_city in unknown_indices:
+                city1 = self.known_cities[0]
+                city2 = self.known_cities[1]
+                city3 = self.known_cities[2]
+
+                r1 = self.distance_matrix[0,unknow_city]
+                r2 = self.distance_matrix[1,unknow_city]
+                r3 = self.distance_matrix[2,unknow_city]
+
+                print(f"\n Unknow city {unknow_city} using: {city1}, {city2} & {city3}")
+
+                max_iterations = 500
+                tolerance = 1e-5
+                x_new = 0
+                steps = 200
+                angles = np.linspace(0,2*np.pi,steps)
+                dim = len(angles)
+                pos1 = np.zeros(dim)
+                print(pos1)
+                pos2 = np.zeros(dim)
+                pos3 = np.zeros(dim)
+
+                pos1 = []
+                pos2 = []
+                pos3 = []
+                counter = 0
+
+                for angle in angles:
+                    '''
+                    pos1[counter] = np.array([r1*np.cos(angle),r1*np.sin(angle)])
+                    pos2[counter] = np.array([r2*np.cos(angle),r2*np.sin(angle)])
+                    pos3[counter] = np.array([r3*np.cos(angle),r3*np.sin(angle)])
+                    '''
+                    print(f"\n Angle: {angle} & r1: {r1} r2: {r2} r3: {r3}")
+                    pos1.append((city1[0]+r1*np.cos(angle),city1[1]+r1*np.sin(angle)))
+                    pos2.append((city2[0]+r2*np.cos(angle),city2[1]+r2*np.sin(angle)))
+                    pos3.append((city3[0]+r3*np.cos(angle),city3[1]+r3*np.sin(angle)))
+                    print(f"\n Positions: \n P1: {pos1[counter]} P2: {pos2[counter]} P3: {pos3[counter]}")
+                    
+                    counter +=1
+                circles = [pos1,pos2,pos3]
+
+                self.plot_circles(circles)
+
+                
+            
+
+        
+        if not circles_method:
+            for unknown_city in unknown_indices:
+                # Try to select three cities with finite distances to the unknown city
+                city_indices = []
+                distances = []
+                for known_index, known_city in enumerate(self.known_cities):
+                    distance = self.distance_matrix[known_index, unknown_city]
+                    if distance != np.inf:
+                        city_indices.append(known_index)
+                        distances.append(distance)
+                    if len(city_indices) == 3:  # Stop once we have three cities
+                        break
+
+                if len(city_indices) < 3:
+                    print(f"Not enough known cities with finite distances to locate city {unknown_city}. Skipping.")
+                    continue
+
+                # Extract the selected cities and their distances
+                city1, city2, city3 = self.known_cities[city_indices[0]], self.known_cities[city_indices[1]], self.known_cities[city_indices[2]]
+                r1, r2, r3 = distances[0], distances[1], distances[2]
+
+                print(f"\nUnknown city {unknown_city} using cities at indices {city_indices}: {city1}, {city2}, & {city3}")
+                print(f"\nDistances: r1: {r1}, r2: {r2}, r3: {r3}")
+
+                max_iterations = 50
+                tolerance = 1e-5
+                learning_rate = 0.5  # Controls the step size to stabilize convergence
+
+                # Initialize guess for x_new and y_new
+                x_new = 0  
+                y_new = city1[1] - np.sqrt(np.abs(r1**2 - (city1[0] - x_new)**2))
+                previous_diff = None
+
+                for iteration in range(max_iterations):
+                    # Recalculate y_new based on city1 and x_new, and x_new based on city2 and y_new
+                    y_new = city1[1] - np.sqrt(np.abs(r1**2 - (city1[0] - x_new)**2))
+                    x_new_calculated = city2[0] - np.sqrt(np.abs(r2**2 - (city2[1] - y_new)**2))
+
+                    # Update x_new with a gradual adjustment to stabilize convergence
+                    x_new = x_new + learning_rate * (x_new_calculated - x_new)
+                    diff = np.abs(x_new_calculated - x_new)
+
+                    # Check for convergence
+                    if diff <= tolerance:
+                        new_city = np.array([x_new, y_new])
+                        print(f" --- CITY FOUND --> {new_city} at iteration {iteration}")
+                        self.known_cities = np.vstack((self.known_cities, new_city))
+                        break
+                    elif previous_diff is not None and abs(diff - previous_diff) < tolerance:
+                        print("Oscillation detected, exiting.")
+                        break
+
+                    # Update previous_diff for oscillation detection
+                    previous_diff = diff
+                    print(f"\nIteration: {iteration} \n x_new_guess: {x_new} \n Calculated: y_new: {y_new}, x_new: {x_new_calculated} \n Diff: {diff}")
+
+                else:
+                    print("Failed to converge within the maximum iterations.")
+
+
+
+
+
+
+
+
+                '''
+                for unknown_city in unknown_indices:
+                    city1, city2, city3 = self.known_cities[:3]
+
+                    r1 = self.distance_matrix[0, unknown_city]
+                    r2 = self.distance_matrix[1, unknown_city]
+                    r3 = self.distance_matrix[2, unknown_city]
+
+                    print(f"\n Unknown city {unknown_city} using: {city1}, {city2} & {city3}")
+                    print(f"\n Distances: r1: {r1}, r2: {r2}, r3: {r3}")
+
+                    max_iterations = 50
+                    tolerance = 1e-5
+                    learning_rate = 0.5  # Controls the step size to stabilize convergence
+
+                    x_new = 0  # Initial guess
+                    y_new = city1[1] - np.sqrt(np.abs(r1**2 - (city1[0] - x_new)**2))
+
+                    previous_diff = None
+
+                    for iteration in range(max_iterations):
+                        # Calculate the new y_new and x_new based on r1 and r2
+                        y_new = city1[1] - np.sqrt(np.abs(r1**2 - (city1[0] - x_new)**2))
+                        x_new_calculated = city2[0] - np.sqrt(np.abs(r2**2 - (city2[1] - y_new)**2))
+
+                        # Update with a gradual adjustment to help stabilize
+                        x_new = x_new + learning_rate * (x_new_calculated - x_new)
+                        diff = np.abs(x_new_calculated - x_new)
+
+                        if diff <= tolerance:
+                            # Successfully found the city location
+                            new_city = np.array([x_new, y_new])
+                            print(f" --- CITY FOUND --> {new_city} at iteration {iteration}")
+                            self.known_cities = np.vstack((self.known_cities, new_city))
+                            break
+                        elif previous_diff is not None and abs(diff - previous_diff) < tolerance:
+                            print("Oscillation detected, exiting.")
+                            break
+
+                        # Update previous_diff to track convergence
+                        previous_diff = diff
+                        print(f"\nIteration: {iteration} \n x_new_guess: {x_new} \n Calculated: y_new: {y_new}, x_new: {x_new_calculated} \n Diff: {diff}")
+
+                    else:
+                        print("Failed to converge within the maximum iterations.")
+
+                '''
+
+
+        print(f"\n Known cities: {len(self.known_cities)} \n {self.known_cities}")
+        self.plot_city_locations()
+        self.verify_computed_distances()
+                    
+                    
+            
+
+    def verify_computed_distances(self,round_to=0):
+        """
+        Automatically generates a distance matrix for given city positions, compares it with the original
+        distance matrix, and checks for equivalency while respecting infinite values.
+
+        Parameters:
+        city_positions (numpy.ndarray): Array of shape (n, 2) representing the x, y coordinates of each city.
+        original_distance_matrix (numpy.ndarray): The original distance matrix with possible np.inf values.
+        round_to (int): Number of decimal places to round distances to (0 rounds to the nearest integer).
+
+        Returns:
+        bool: True if the computed distance matrix matches the original distance matrix within the specified tolerance.
+        """
+        # Step 1: Generate the computed distance matrix
+        city_positions = self.known_cities
+        original_distance_matrix = self.distance_matrix
+        num_cities = city_positions.shape[0]
+        print(f"\n Number of Cities: {num_cities}")
+        computed_distance_matrix = np.zeros((num_cities, num_cities))
+        
+        # Calculate Euclidean distances for each pair of cities
+        for i in range(num_cities):
+            for j in range(num_cities):
+                if i == j:
+                    computed_distance_matrix[i, j] = 0
+                else:
+                    distance = np.linalg.norm(city_positions[i] - city_positions[j])
+                    computed_distance_matrix[i, j] = distance
+
+        # Step 2: Prepare matrices for comparison with rounding
+        rounded_computed_matrix = np.where(
+            np.isfinite(computed_distance_matrix),
+            np.round(computed_distance_matrix, decimals=round_to),
+            np.inf
+        )
+        rounded_original_matrix = np.where(
+            np.isfinite(original_distance_matrix),
+            np.round(original_distance_matrix, decimals=round_to),
+            np.inf
+        )
+        
+        # Step 3: Create a mask of finite values to compare only the finite entries
+        finite_mask = np.isfinite(original_distance_matrix)
+        
+        # Check if all finite values match within the specified tolerance
+        finite_values_match = np.allclose(rounded_computed_matrix[finite_mask], rounded_original_matrix[finite_mask])
+        
+        # Check if infinite values are in the same locations in both matrices
+        inf_values_match = np.array_equal(np.isinf(rounded_computed_matrix), np.isinf(rounded_original_matrix))
+        
+        # Output results
+        if finite_values_match and inf_values_match:
+            print("The computed distance matrix matches the original distance matrix.")
+            return True
+        else:
+            print("Discrepancy found between computed and original distance matrices.")
+            return False
+
+
+
+
+
+    def plot_city_locations(self):
+       
+        
+        plt.figure(figsize=(10, 8))
+        plt.scatter(self.known_cities[:, 0], self.known_cities[:, 1], c='blue', marker='o')
+        
+        plt.title('City Locations')
+        plt.xlabel('X Coordinate')
+        plt.ylabel('Y Coordinate')
+        plt.grid(True)
+        plt.show()
+
+    
     def check_inf(self,distance_matrix,replace_value):
         '''
         - Check if the distance matrix has inf values and replace them with a given value
         '''
-        distance_matrix[distance_matrix == np.inf] = replace_value
+        #distance_matrix[distance_matrix == np.inf] = replace_value
         return distance_matrix
+    
+
+    def k_means_distanced(self,distance_matrix):
+        self.set_distance_matrix(distance_matrix=distance_matrix)
+        self.calculate_city_locations()
+        self.plot_city_locations()  
+    
+
+
+
+
 
     def set_initialization(self):
         '''
@@ -400,6 +726,99 @@ class GA:
     
     
 
+
+
+
+
+
+
+
+
+
+
+    def plot_distance_matrix(self):
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(self.distance_matrix, cmap='viridis', annot=False)
+        plt.title('Distance Matrix Heatmap')
+        plt.xlabel('City Index')
+        plt.ylabel('City Index')
+        plt.show()
+
+    def plot_circles(self,circles):
+        circle1 = circles[0]
+        circle2 = circles[1]
+        circle3 = circles[2]
+
+        circle1_x = []
+        circle1_y = []
+        circle2_x = []
+        circle2_y = []
+        circle3_x = []
+        circle3_y = []
+
+        for i in range(len(circle1)):
+            #print(circle1[i])
+            circle1_x.append(circle1[i][0])
+            circle1_y.append(circle1[i][1])
+            circle2_x.append(circle2[i][0])
+            circle2_y.append(circle2[i][1])
+            circle3_x.append(circle3[i][0])
+            circle3_y.append(circle3[i][1])
+
+        
+        print(f"Circle_1 x: {circle1_x}")
+
+        
+        # Create a plotly figure
+        fig = go.Figure()
+
+        # Add the best fitness trace
+        fig.add_trace(go.Scatter(
+            x=circle1_x,
+            y=circle1_y,
+            mode='lines+markers',
+            name='Circle 1',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=circle2_x,
+            y=circle2_y,
+            mode='lines+markers',
+            name='Circle 2',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=circle3_x,
+            y=circle3_y,
+            mode='lines+markers',
+            name='Circle 3',
+            line=dict(color='red'),
+            marker=dict(symbol='x')
+        ))
+
+        
+
+
+        # Set the title and axis labels
+        fig.update_layout(
+            title=f'Circles',
+            xaxis_title='X',
+            yaxis_title='Y',
+            legend=dict(x=0, y=1),
+            hovermode='x'
+        )
+
+        # Show the plot
+        fig.show()
+        
+
+
+
+
     def plot_fitness(self):
         #print(f"IS IT HERE")
         plt.figure(figsize=(10, 5))
@@ -479,16 +898,3 @@ class GA:
 
         # Show the plot
         fig.show()
-
-
-    def distance_map_plot(self):
-        '''
-        - Plot the distance map
-        '''
-
-    
-        plt.figure(figsize=(10, 10))
-        plt.imshow(self.distance_matrix, cmap='viridis')
-        plt.colorbar()
-        plt.title('Distance Matrix')
-        plt.show()

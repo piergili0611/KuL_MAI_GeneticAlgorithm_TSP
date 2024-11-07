@@ -1,6 +1,6 @@
 import Reporter
 import numpy as np
-from Evol_algorithm import GA
+from Evol_algorithm_K import GA_K
 
 # Modify the class name to match your student number.
 class r0818807:
@@ -8,24 +8,36 @@ class r0818807:
 	def __init__(self):
 		self.reporter = Reporter.Reporter(self.__class__.__name__)
 		self.num_simulations_to_run = 2
+
+	def k_means_algorithm(self, filename):
+		file = open(filename)
+		distanceMatrix = np.loadtxt(file, delimiter=",")
+		file.close()
+		
+
+		model = GA_K(seed=42)
+		#model.k_means_distanced(distance_matrix=distanceMatrix)
+		model.iterative_refinement(distance_matrix=distanceMatrix)
+
 		
 
 	# The evolutionary algorithm's main loop
-	def optimize(self, filename,mutation_prob=0.01):
+	def optimize(self, filename,mutation_prob=0.008):
 		# Read distance matrix from file.		
 		file = open(filename)
 		distanceMatrix = np.loadtxt(file, delimiter=",")
 		file.close()
 		
 
-		model = GA(mutation_prob=mutation_prob)
+		model = GA_K(mutation_prob=mutation_prob,seed=42)
 		model.set_distance_matrix(distanceMatrix)
 		model.set_initialization()
+		model.plot_distance_matrix()
 		
 
 		# Your code here.
 		yourConvergenceTestsHere = False
-		num_iterations = 1000
+		num_iterations = 500
 		iterations = 0
 		while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
 			'''
