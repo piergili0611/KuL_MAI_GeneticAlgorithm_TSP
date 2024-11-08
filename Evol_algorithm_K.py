@@ -50,13 +50,208 @@ class GA_K:
         plt.ylabel('City Index')
         plt.show()
 
+
+    #--------------------------------------------------------------- K_meloids clustering ---------------------------------------------------------------
+    #--------------------------------------------------------------- K_meloids clustering ---------------------------------------------------------------
+    #--------------------------------------------------------------- K_meloids clustering ---------------------------------------------------------------
+    #--------------------------------------------------------------- K_meloids clustering ---------------------------------------------------------------
+
+
+    def find_closest_finite_city(self,distance_matrix, city_index):
+        """
+        Find the closest city to the given city_index that has a finite distance.
+
+        Parameters:
+        - distance_matrix (numpy.ndarray): The distance matrix with possible np.inf values.
+        - city_index (int): The index of the city for which we want to find the closest connected city.
+
+        Returns:
+        - closest_city (int): The index of the closest city with a finite distance, or None if all distances are infinite.
+        """
+        finite_distances = distance_matrix[city_index]
+        finite_city_indices = np.where(np.isfinite(finite_distances))[0]
+        
+        if len(finite_city_indices) == 0:
+            return None  # No reachable cities
+        
+        # Find the index of the closest city with a finite distance
+        closest_city = finite_city_indices[np.argmin(finite_distances[finite_city_indices])]
+        return closest_city
+    
+    def handle_infinite_distances(self,distance_matrix, labels, medoids):
+        """
+        Reassigns cities with infinite distances to medoids based on the cluster assignment
+        of the nearest connected cities.
+        
+        Parameters:
+        - distance_matrix: numpy.ndarray, the distance matrix with possible np.inf values.
+        - labels: numpy.ndarray, initial cluster assignments.
+        - medoids: list, the current medoids.
+        
+        Returns:
+        - labels: numpy.ndarray, updated cluster assignments.
+        """
+        n_cities = distance_matrix.shape[0]
+        for city in range(n_cities):
+            # Skip cities that already have a valid cluster assignment
+            if labels[city] != -1:
+                continue
+            
+            # Use the helper function to find the closest city with a finite distance
+            closest_city = self.find_closest_finite_city(distance_matrix, city)
+            
+            if closest_city is not None:
+                # Assign the current city to the cluster of the closest connected city
+                labels[city] = labels[closest_city]
+                print(f"City {city} assigned to cluster {labels[closest_city]} based on closest city {closest_city}.")
+            else:
+                print(f"Warning: City {city} has no reachable cities and remains unassigned.")
+        
+        return labels
+
+    def find_closest_finite_city(self,distance_matrix, city):
+            """
+            Finds the closest city with a finite distance.
+            
+            Parameters:
+            - distance_matrix: numpy.ndarray, the distance matrix with possible np.inf values.
+            - city: int, the index of the city for which we are finding the closest city.
+            
+            Returns:
+            - int: the index of the closest city with a finite distance, or None if none found.
+            """
+            n_cities = distance_matrix.shape[0]
+            min_distance = np.inf
+            closest_city = None
+            
+            for other_city in range(n_cities):
+                if np.isfinite(distance_matrix[city, other_city]) and distance_matrix[city, other_city] < min_distance:
+                    min_distance = distance_matrix[city, other_city]
+                    closest_city = other_city
+            
+            return closest_city
+
+    def k_medoids_clustering(self, k=4, max_iterations=300, tolerance=1e-1, distance_tolerance=1e-3):
+        """
+        Perform k-Medoids clustering from a distance matrix.
+        
+        Parameters:
+        - distance_matrix (numpy.ndarray): The distance matrix, where distance_matrix[i, j] is the distance between city i and city j.
+        - k (int): The number of clusters.
+        - max_iterations (int): The maximum number of iterations to run the algorithm.
+        - tolerance (float): The tolerance level to stop the algorithm if medoids stop changing.
+        
+        Returns:
+        - medoids (list): The final medoids (cluster centers).
+        - labels (numpy.ndarray): The cluster assignment for each city.
+        """
+
+        # Initialize medoids randomly
+        distance_matrix = self.distance_matrix  
+        n_cities = distance_matrix.shape[0]
+        medoids = np.random.choice(n_cities, k, replace=False)
+        prev_medoids = np.copy(medoids)
+        prev_intra_cluster_distance = np.inf
+        intra_cluster_distances_dict = {}  # To store intra-cluster distances
+
+        for iteration in range(max_iterations):
+            print(f"\nIteration {iteration + 1}:")
+            print(f"Current Medoids: {medoids}")
+            
+            labels = np.full(n_cities, -1)  # Initialize all cities as unassigned
+            for city in range(n_cities):
+                min_distance = np.inf
+                for medoid in medoids:
+                    if distance_matrix[city, medoid] != np.inf:  # Avoiding inf distances
+                        if distance_matrix[city, medoid] < min_distance:
+                            min_distance = distance_matrix[city, medoid]
+                            labels[city] = medoid
+
+            # Handle cities with infinite distances
+            labels = self.handle_infinite_distances(distance_matrix, labels, medoids)
+            
+            new_medoids = np.copy(medoids)
+            total_intra_cluster_distance = 0  # Total distance to compute the convergence criteria
+
+            # Update medoids by minimizing the total intra-cluster distance
+            for cluster in range(k):
+                cluster_cities = np.where(labels == medoids[cluster])[0]
+                if len(cluster_cities) > 0:
+                    best_medoid = cluster_cities[0]
+                    min_total_distance = np.inf
+
+                    for city in cluster_cities:
+                        total_distance = 0
+                        for other_city in cluster_cities:
+                            if np.isfinite(distance_matrix[city, other_city]):
+                                total_distance += distance_matrix[city, other_city]
+                        
+                        if total_distance < min_total_distance:
+                            min_total_distance = total_distance
+                            best_medoid = city
+                    
+                    new_medoids[cluster] = best_medoid
+                    intra_cluster_distances_dict[cluster] = min_total_distance
+                    total_intra_cluster_distance += min_total_distance
+
+            # Check for convergence
+            diff = np.abs(np.sum(new_medoids - prev_medoids))
+            if np.all(new_medoids == prev_medoids) or (diff < tolerance):
+                print(f"Converged after {iteration + 1} iterations.")
+                break
+            
+            prev_medoids = np.copy(new_medoids)
+            medoids = np.copy(new_medoids)
+        
+        # Print final clustering results
+        print("\nFinal Clustering Results:")
+        for cluster in range(k):
+            cluster_cities = np.where(labels == medoids[cluster])[0]
+            intra_cluster_distance = intra_cluster_distances_dict.get(cluster, 0)
+            print(f"\nCluster {cluster + 1}:")
+            print(f"  Medoid: {medoids[cluster]}")
+            print(f"  Number of Cities: {len(cluster_cities)}")
+            print(f"  Assigned Cities: {cluster_cities}")
+            print(f"  Intra-Cluster Distance: {intra_cluster_distance}")
+        self.plot_clusters(distance_matrix, medoids, labels, k) 
+
+        return medoids, labels, intra_cluster_distances_dict
+
+
+
+    def plot_clusters(self,distance_matrix, medoids, labels, k):
+        plt.figure(figsize=(10, 6))
+        colors = plt.cm.get_cmap('tab10', k)
+        
+        for cluster in range(k):
+            cluster_cities = np.where(labels == medoids[cluster])[0]
+            cluster_color = colors(cluster)
+
+            plt.scatter(cluster_cities, np.zeros(len(cluster_cities)), color=cluster_color, label=f"Cluster {cluster + 1}")
+            plt.scatter(medoids[cluster], 0, color="black", marker="X", s=100, label=f"Medoid {cluster + 1}")
+
+        plt.title(f"K-Medoids Clustering with {k} clusters")
+        plt.xlabel("City Index")
+        plt.ylabel("Dummy Value (Y-axis is not used)")
+        plt.legend()
+        plt.show()
+
+
+
+
+
+
+
+
+
+
     def set_known_locations(self, known_locations):
         # Initialize the count of valid cities and set x_new coordinate
         valid_cities = 1  # Start with the first city as valid (index 0)
         x_new = 0  # Set x_new coordinate for new cities along x-axis
 
         # Iterate to find exactly 3 valid cities based on the distance matrix
-        while valid_cities < 4:
+        while valid_cities < 3:
             # Calculate distances to the next potential city (valid_cities + 1)
             r_from_first = self.distance_matrix[0, valid_cities]
             if valid_cities > 1:
@@ -95,12 +290,9 @@ class GA_K:
 
         
         unknown_indices = np.arange(start=len_known,stop=n,step=1)
-        
-    
-        
-        print(f"\n Unknown indices: {unknown_indices}")
+        print(f"\n Unknown indices: {len(unknown_indices)}")
 
-        #calculate me the indices of cities taht we do now know yet
+        print(f"\n Known cities: {len(self.known_cities)} \n {self.known_cities}")
         
 
 
@@ -125,7 +317,7 @@ class GA_K:
                 print(f"\n Unknow city {unknow_city} using: {city1}, {city2} & {city3}")
 
                 max_iterations = 500
-                tolerance = 1e-5
+                tolerance = 1e-10
                 x_new = 0
                 steps = 200
                 angles = np.linspace(0,2*np.pi,steps)
@@ -174,32 +366,45 @@ class GA_K:
                     if len(city_indices) == 3:  # Stop once we have three cities
                         break
 
-                if len(city_indices) < 3:
+                if len(city_indices) < 2:
                     print(f"Not enough known cities with finite distances to locate city {unknown_city}. Skipping.")
                     continue
 
                 # Extract the selected cities and their distances
-                city1, city2, city3 = self.known_cities[city_indices[0]], self.known_cities[city_indices[1]], self.known_cities[city_indices[2]]
-                r1, r2, r3 = distances[0], distances[1], distances[2]
+                city1, city2 = self.known_cities[city_indices[0]], self.known_cities[city_indices[1]]
+                r1, r2 = distances[0], distances[1]
 
-                print(f"\nUnknown city {unknown_city} using cities at indices {city_indices}: {city1}, {city2}, & {city3}")
-                print(f"\nDistances: r1: {r1}, r2: {r2}, r3: {r3}")
+                # Check if a third city is available for added accuracy
+                if len(city_indices) == 3:
+                    city3 = self.known_cities[city_indices[2]]
+                    r3 = distances[2]
+                    print(f"\nUnknown city {unknown_city} using cities at indices {city_indices}: {city1}, {city2}, {city3}")
+                    print(f"\nDistances: r1: {r1}, r2: {r2}, r3: {r3}")
+                else:
+                    print(f"\nUnknown city {unknown_city} using cities at indices {city_indices}: {city1}, {city2}")
+                    print(f"\nDistances: r1: {r1}, r2: {r2}")
 
-                max_iterations = 50
+                # Setup iterative method parameters
+                max_iterations = 10000
                 tolerance = 1e-5
-                learning_rate = 0.5  # Controls the step size to stabilize convergence
+                learning_rate = 0.01
 
-                # Initialize guess for x_new and y_new
-                x_new = 0  
+                # Initial guess for x_new and y_new
+                x_new = 0
                 y_new = city1[1] - np.sqrt(np.abs(r1**2 - (city1[0] - x_new)**2))
                 previous_diff = None
 
                 for iteration in range(max_iterations):
-                    # Recalculate y_new based on city1 and x_new, and x_new based on city2 and y_new
+                    # Calculate y_new based on city1 and x_new, and x_new based on city2 and y_new
                     y_new = city1[1] - np.sqrt(np.abs(r1**2 - (city1[0] - x_new)**2))
                     x_new_calculated = city2[0] - np.sqrt(np.abs(r2**2 - (city2[1] - y_new)**2))
 
-                    # Update x_new with a gradual adjustment to stabilize convergence
+                    # If a third city is available, adjust x_new further to satisfy r3
+                    if len(city_indices) == 3:
+                        y_new_adjusted = city3[1] - np.sqrt(np.abs(r3**2 - (city3[0] - x_new)**2))
+                        y_new = y_new + learning_rate * (y_new_adjusted - y_new)
+
+                    # Update x_new with gradual adjustment to stabilize convergence
                     x_new = x_new + learning_rate * (x_new_calculated - x_new)
                     diff = np.abs(x_new_calculated - x_new)
 
@@ -209,13 +414,14 @@ class GA_K:
                         print(f" --- CITY FOUND --> {new_city} at iteration {iteration}")
                         self.known_cities = np.vstack((self.known_cities, new_city))
                         break
+
                     elif previous_diff is not None and abs(diff - previous_diff) < tolerance:
-                        print("Oscillation detected, exiting.")
-                        break
+                        print(f"Oscillation detected. Diff:  {diff} - {previous_diff}")
 
                     # Update previous_diff for oscillation detection
                     previous_diff = diff
-                    print(f"\nIteration: {iteration} \n x_new_guess: {x_new} \n Calculated: y_new: {y_new}, x_new: {x_new_calculated} \n Diff: {diff}")
+                    # Optionally, print progress for each iteration
+                    #print(f"\nIteration: {iteration} \n x_new_guess: {x_new} \n Calculated: y_new: {y_new}, x_new: {x_new_calculated} \n Diff: {diff}")
 
                 else:
                     print("Failed to converge within the maximum iterations.")
@@ -296,9 +502,12 @@ class GA_K:
         Returns:
         bool: True if the computed distance matrix matches the original distance matrix within the specified tolerance.
         """
+        # Set print options to display the full matrix
+        np.set_printoptions(threshold=np.inf)
         # Step 1: Generate the computed distance matrix
         city_positions = self.known_cities
         original_distance_matrix = self.distance_matrix
+        print(f"\n Original distance matrix: \n {original_distance_matrix}")
         num_cities = city_positions.shape[0]
         print(f"\n Number of Cities: {num_cities}")
         computed_distance_matrix = np.zeros((num_cities, num_cities))
@@ -311,7 +520,7 @@ class GA_K:
                 else:
                     distance = np.linalg.norm(city_positions[i] - city_positions[j])
                     computed_distance_matrix[i, j] = distance
-
+        print(f"\n Computed distance matrix: \n {computed_distance_matrix}")
         # Step 2: Prepare matrices for comparison with rounding
         rounded_computed_matrix = np.where(
             np.isfinite(computed_distance_matrix),
@@ -323,6 +532,8 @@ class GA_K:
             np.round(original_distance_matrix, decimals=round_to),
             np.inf
         )
+        print(f"\n Rounded computed matrix: \n {rounded_computed_matrix}")  
+        print(f"\n Rounded original matrix: \n {rounded_original_matrix}")
         
         # Step 3: Create a mask of finite values to compare only the finite entries
         finite_mask = np.isfinite(original_distance_matrix)
