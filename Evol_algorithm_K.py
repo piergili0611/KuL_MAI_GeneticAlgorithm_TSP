@@ -103,7 +103,7 @@ class GA_K:
             if closest_city is not None:
                 # Assign the current city to the cluster of the closest connected city
                 labels[city] = labels[closest_city]
-                print(f"City {city} assigned to cluster {labels[closest_city]} based on closest city {closest_city}.")
+                #print(f"City {city} assigned to cluster {labels[closest_city]} based on closest city {closest_city}.")
             else:
                 print(f"Warning: City {city} has no reachable cities and remains unassigned.")
         
@@ -130,6 +130,8 @@ class GA_K:
                     closest_city = other_city
             
             return closest_city
+    
+
 
     def k_medoids_clustering(self, k=4, max_iterations=300, tolerance=1e-1, distance_tolerance=1e-3):
         """
@@ -153,6 +155,7 @@ class GA_K:
         prev_medoids = np.copy(medoids)
         prev_intra_cluster_distance = np.inf
         intra_cluster_distances_dict = {}  # To store intra-cluster distances
+        intre_cluster_distances = np.zeros(k)
 
         for iteration in range(max_iterations):
             print(f"\nIteration {iteration + 1}:")
@@ -189,6 +192,7 @@ class GA_K:
                         if total_distance < min_total_distance:
                             min_total_distance = total_distance
                             best_medoid = city
+                        #print(f"City {city} has total distance {total_distance} to other cities in cluster {cluster + 1}.")
                     
                     new_medoids[cluster] = best_medoid
                     intra_cluster_distances_dict[cluster] = min_total_distance

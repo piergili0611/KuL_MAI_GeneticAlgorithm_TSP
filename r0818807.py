@@ -19,7 +19,7 @@ class r0818807:
 		model.set_distance_matrix(distanceMatrix)
 		#model.k_means_distanced(distance_matrix=distanceMatrix)
 		#model.iterative_refinement(distance_matrix=distanceMatrix)
-		model.k_medoids_clustering()
+		model.k_medoids_clustering(k=int(model.gen_size/10))
 
 		
 
