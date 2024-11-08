@@ -133,7 +133,7 @@ class GA_K:
     
 
 
-    def k_medoids_clustering(self, k=4, max_iterations=20, tolerance=1e-1, distance_tolerance=100):
+    def k_medoids_clustering(self, k=4, max_iterations=20, tolerance=1e-1, distance_tolerance=100, min_cluster_size=10):
         """
         Perform k-Medoids clustering from a distance matrix.
         
@@ -180,37 +180,55 @@ class GA_K:
             for cluster in range(k):
                 cluster_cities = np.where(labels == medoids[cluster])[0]  # Get cities assigned to the current cluster
                 if len(cluster_cities) > 0:  # Only proceed if the cluster is not empty
-                    best_medoid = cluster_cities[0]  # Start with the first city as the best medoid
-                    min_total_distance = np.inf  # Initialize to a very large number to minimize later
-                    
-                    for city in cluster_cities:
+                    min_total_distance = np.inf  # Initialize to a very large number to minimize late.
+                    print(f"\nCluster {cluster}")
+
+                    for meloid in cluster_cities:
+                        best_medoid = meloid
+                        print(f"\n       Medoid:{best_medoid} cluster_cities: {cluster_cities} number of cities: {len(cluster_cities)}")
+                       
                         total_distance = 0
-                        for other_city in cluster_cities:
-                            # If the distance is finite, we add it to the total distance
-                            if np.isfinite(distance_matrix[city, other_city]):
-                                total_distance += distance_matrix[city, other_city]
+
+                        for city in cluster_cities:
+                        
+                            
+                            # Distance from the medoid to the current city
+                            distance = distance_matrix[best_medoid, city]
+                            #print(f"Cluster: {best_medoid}  & City {city} Total Distance: {total_distance} with distance: {distance}")
+                            
+                            # If the distance is finite, add it to the total distance
+                            if np.isfinite(distance):
+                                total_distance += distance
                             else:
-                                # If the distance is inf, calculate it as the sum of the distance from the medoid to the closest city
-                                # and the distance between the closest city and the current city
-                                # Find the closest city to the current city
+                                # If the distance is infinite, find the closest city in the cluster with a finite distance
+                                #print(f"City {city} has infinite distance to the medoid.")
                                 closest_city = None
                                 closest_distance = np.inf
-                                for other in cluster_cities:
-                                    if np.isfinite(distance_matrix[city, other]) and distance_matrix[city, other] < closest_distance:
-                                        closest_city = other
-                                        closest_distance = distance_matrix[city, other]
+                                dist_closest_to_meloid = 0
                                 
-                                # Add the closest city distance (medoid -> closest_city) + (closest_city -> city)
+                                for other_city in cluster_cities:
+                                    if np.isfinite(distance_matrix[city, other_city]) and distance_matrix[city, other_city] < closest_distance and np.isfinite(distance_matrix[best_medoid, other_city]):
+                                        closest_city = other_city
+                                        closest_distance = distance_matrix[city, other_city]
+                                        dist_closest_to_meloid = distance_matrix[best_medoid, closest_city]    
+                                
+                                # Add the distance to the closest city to the total distance if found
                                 if closest_city is not None:
-                                    total_distance += (distance_matrix[medoids[cluster], closest_city] + closest_distance)
-                        
+                                    #print(f"City {city} has infinite distance to the medoid. Closest city: {closest_city} Distance: {closest_distance}")
+                                    total_distance += closest_distance + dist_closest_to_meloid
+                                else:
+                                    print(f"Warning: City {city} has no reachable cities in the cluster.")
+
+                                        
                         # Update the best medoid if the total distance is smaller
                         if total_distance < min_total_distance:
+                            print(f"Total Distance: {total_distance} < {min_total_distance}")
                             min_total_distance = total_distance
-                            best_medoid = city
+                            best_medoid_final = best_medoid
+                            print(f"Best Medoid Final: {best_medoid_final} Total Distance: {min_total_distance}")
 
                     # Update the medoid for the cluster with the best one found
-                    new_medoids[cluster] = best_medoid
+                    new_medoids[cluster] = best_medoid_final
                     intra_cluster_distances_dict[cluster] = min_total_distance
                     total_intra_cluster_distance += min_total_distance
 
@@ -244,7 +262,7 @@ class GA_K:
         for cluster in range(k):
             cluster_cities = np.where(labels == medoids[cluster])[0]
             intra_cluster_distance = intra_cluster_distances_dict.get(cluster, 0)
-            print(f"\nCluster {cluster + 1}:")
+            print(f"\nCluster {cluster}:")
             print(f"  Medoid: {medoids[cluster]}")
             print(f"  Number of Cities: {len(cluster_cities)}")
             print(f"  Assigned Cities: {cluster_cities}")
@@ -252,7 +270,7 @@ class GA_K:
             
         self.verify_unique_cluster_assignment(labels, k)    
         self.plot_intra_cluster_distances(distance_matrix, intra_cluster_distances, labels, medoids, k)
-        medoids, labels, k = self.handle_empty_or_small_clusters(distance_matrix, medoids, labels, k, min_cluster_size=5) 
+        medoids, labels, k = self.handle_empty_or_small_clusters(distance_matrix, medoids, labels, k, min_cluster_size=min_cluster_size)
         intra_cluster_distances = self.calculate_intra_cluster_distance(distance_matrix, labels, medoids)    
         self.plot_intra_cluster_distances(distance_matrix, intra_cluster_distances, labels, medoids, k) 
 
@@ -275,9 +293,11 @@ class GA_K:
         """
         print("\nHandling Empty or Small Clusters:")
         print(f"Number of Clusters: {k}")
-        print(f"Number of Cities: {len(labels)}")
-        print(f"Cluster Assignments: {labels}")
         print(f"Clusters: {clusters}")
+        print(f"Number of Cities: {len(labels)}")
+        #print(f"Cluster Assignments: {labels}")
+        print(f"Minimum Cluster Size: {min_cluster_size}")
+        
 
         # We will need to modify clusters, so we will create a new list for valid clusters
         new_clusters = []
@@ -287,11 +307,11 @@ class GA_K:
         for cluster_idx in range(k):
             # Find the cities assigned to the current cluster
             cluster_cities = np.where(labels == clusters[cluster_idx])[0]
-            print(f"\nCluster {cluster_idx}: cluster_cities: {cluster_cities}") 
             
             # If the cluster is empty or has fewer cities than the minimum size
             if len(cluster_cities) < min_cluster_size:
-                print(f"Cluster {cluster_idx} is too small or empty, reassigning cities.")
+                medoid = clusters[cluster_idx]
+                print(f"Cluster {cluster_idx} with medoid: {medoid} is too small with number of cities {len(cluster_cities)} or empty, reassigning cities.")
                 
                 # For each city in this cluster, find the closest valid medoid
                 for city in cluster_cities:
@@ -309,16 +329,19 @@ class GA_K:
                     
                     # Reassign the city to the closest cluster
                     new_labels[city] = best_medoid
+                    print(f"City {city} reassigned to medoid {best_medoid} with distance {min_distance}.")
                 # Do not add the current cluster to the new_clusters list (remove it)
             else:
                 # If the cluster is valid (not empty or too small), keep it
                 new_clusters.append(clusters[cluster_idx])
+           
 
         # We may have fewer clusters after removal, update k accordingly
         k = len(new_clusters)
         print(f"\n New Number of Clusters: {k}")
-        print(f"New Cluster Assignments: {new_labels}")
+        #print(f"New Cluster Assignments: {new_labels}")
         print(f"New Clusters: {new_clusters}")
+        print(f"New Number of Cities: {len(new_labels)}")
 
         # Return the updated clusters and labels
         return new_clusters, new_labels, k
@@ -339,49 +362,47 @@ class GA_K:
 
         k = len(medoids)  # Number of clusters
         intra_cluster_distances = {}  # To store the intra-cluster distances
-        print(f"Number of Clusters: {k}")
         
         # Iterate over each cluster
         for cluster in range(k):
             cluster_cities = np.where(labels == medoids[cluster])[0]  # Get cities assigned to the current cluster
             total_intra_cluster_distance = 0  # To accumulate the total intra-cluster distance
+            #print(f"\nCluster {cluster}: cluster_cities: {cluster_cities} number of cities: {len(cluster_cities)}")
             
             # Only proceed if the cluster is not empty
             if len(cluster_cities) > 0:
                 for city in cluster_cities:
-                    # Initialize the distance for the current city
-                    total_distance = 0
-                    for other_city in cluster_cities:
-                        # If the distance is finite, add it to the total distance
-                        print(f"City: {city} Other City: {other_city}")
-                        print(f"Distance: {distance_matrix[city, other_city]}")
-                        if np.isfinite(distance_matrix[city, other_city]):
-                            total_distance += distance_matrix[city, other_city]
-                        else:
-                            # If the distance is infinite, calculate it as the sum of the distance from the medoid to the closest city
-                            # and the distance between the closest city and the current city
-                            closest_city = None
-                            closest_distance = np.inf
-                            
-                            for other in cluster_cities:
-                                if np.isfinite(distance_matrix[city, other]) and distance_matrix[city, other] < closest_distance:
-                                    closest_city = other
-                                    closest_distance = distance_matrix[city, other]
-                            
-                            # Add the closest city distance (medoid -> closest_city) + (closest_city -> city)
-                            if closest_city is not None:
-                                total_distance += (distance_matrix[medoids[cluster], closest_city] + closest_distance)
+                    # Distance from the medoid to the current city
+                    distance = distance_matrix[medoids[cluster], city]
+                    #print(f"Cluster: {medoids[cluster]}  & City {city} Distance: {distance}")
                     
-                    # Add the distance for the current city to the total intra-cluster distance
-                    total_intra_cluster_distance += total_distance
-            
+                    # If the distance is finite, add it to the total distance
+                    if np.isfinite(distance):
+                        total_intra_cluster_distance += distance
+                    else:
+                        # If the distance is infinite, find the closest city in the cluster with a finite distance
+                        closest_city = None
+                        closest_distance = np.inf
+                        dist_closest_to_meloid = 0
+                        
+                        for other_city in cluster_cities:
+                            if np.isfinite(distance_matrix[city, other_city]) and distance_matrix[city, other_city] < closest_distance and np.isfinite(distance_matrix[medoids[cluster], other_city]):
+                                closest_city = other_city
+                                closest_distance = distance_matrix[city, other_city]
+                                dist_closest_to_meloid = distance_matrix[medoids[cluster], closest_city]    
+                        
+                        # Add the distance to the closest city to the total distance if found
+                        if closest_city is not None:
+                            total_intra_cluster_distance += closest_distance + dist_closest_to_meloid
+
             # Store the total intra-cluster distance for this cluster
             intra_cluster_distances[cluster] = total_intra_cluster_distance
-        print(f"Intra-Cluster Distances: {intra_cluster_distances}")
 
         # Return the dictionary of intra-cluster distances
-        return intra_cluster_distances
+        intra_cluster_distances = np.array(list(intra_cluster_distances.values()))
+        #print(f"Intra-Cluster Distances: {intra_cluster_distances}")
 
+        return intra_cluster_distances
 
     
 
@@ -430,16 +451,37 @@ class GA_K:
         - medoids (numpy.ndarray): The medoids of the clusters.
         - k (int): The number of clusters.
         """
+        print("\nPlotting Intra-Cluster Distances:")
+        print(f"Number of Clusters: {k}")
+        print(f"Number of Cities: {len(labels)}")
+        print(f"Cluster Assignments: {labels}")
+        print(f"Medoids: {medoids}")
+        print(f"Inter-Cluster Distances: {inter_cluster_distance}")
+        cluster_cities = []
+        for cluster in range(k):
+            cluster_cities.append(len(np.where(labels == medoids[cluster])[0]))
        
         
+        fig, axes = plt.subplots(1, 2, figsize=(15, 6))  # 1 row, 2 columns
+
         # Plot the intra-cluster distances
-        plt.figure(figsize=(10, 6))
-        plt.bar(range(k), inter_cluster_distance, color='skyblue')
-        plt.xlabel('Cluster Index')
-        plt.ylabel('Intra-Cluster Distance')
-        plt.title('Intra-Cluster Distances for Each Cluster')
-        plt.xticks(range(k))
+        axes[0].bar(range(k), inter_cluster_distance, color='skyblue')
+        axes[0].set_xlabel('Cluster Index')
+        axes[0].set_ylabel('Intra-Cluster Distance')
+        axes[0].set_title('Intra-Cluster Distances for Each Cluster')
+        axes[0].set_xticks(range(k))
+
+        # Plot the number of cities in each cluster
+        axes[1].bar(range(k), cluster_cities, color='skyblue')
+        axes[1].set_xlabel('Cluster Index')
+        axes[1].set_ylabel('Number of Cities')
+        axes[1].set_title('Number of Cities in Each Cluster')
+        axes[1].set_xticks(range(k))
+
+        # Show both plots
+        plt.tight_layout()  # Adjusts layout for better spacing
         plt.show()
+
 
 
 
