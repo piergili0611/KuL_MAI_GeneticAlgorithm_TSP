@@ -1,0 +1,130 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import seaborn as sns
+
+
+
+class cities:
+    def __init__(self,num_cities):
+        self.num_simulations_to_run = 2
+        self.distanceMatrix = None
+        self.num_cities = num_cities  
+        self.cities = self.generate_cities()  
+        self.clusters_list = None
+
+    def print_model(self):
+        '''
+        - Print the model
+        '''
+        print("\n---------- Cities Generation: ------")
+        print(f"   * Model Info:")
+        print(f"       - Number of cities: {self.num_cities}")
+    
+
+
+
+    def generate_cities(self):
+        '''
+        - Generate the cities
+        '''
+        self.print_model()
+
+        scale_factor = 100
+        cities = np.random.rand(self.num_cities,2) * scale_factor
+        return cities
+    
+    def generate_distance_matrix(self):
+        '''
+        - Generate the distance matrix
+        '''
+        distanceMatrix = np.zeros((self.num_cities,self.num_cities))
+        for i in range(self.num_cities):
+            for j in range(self.num_cities):
+                distanceMatrix[i,j] = np.linalg.norm(self.cities[i]-self.cities[j])
+        self.distanceMatrix = distanceMatrix
+        return distanceMatrix
+    
+
+    def add_clusters(self,clusters_list):
+        '''
+        - Add the clusters
+        '''
+        self.clusters_list = clusters_list
+
+    def plot_clusters(self):
+        """
+        Plot each cluster with a different color and highlight the medoid.
+        """
+        print("\n---------- Plotting Clusters: ------")
+        
+        # Choose a color palette with strong distinctions between colors
+        num_clusters = len(self.clusters_list)
+        if num_clusters <= 10:
+            colors = sns.color_palette("Dark2", num_clusters)  # 'tab10' has 10 highly distinct colors
+        elif num_clusters <= 12:
+            colors = sns.color_palette("Set1", num_clusters)  # 'Set1' has 9 distinct colors but works well for up to 12
+        else:
+            # For more than 12 clusters, we fall back on the HSV palette with high saturation
+            colors = sns.color_palette("hsv", num_clusters)
+        
+        # Create a new figure
+        plt.figure(figsize=(10, 8))
+        
+        # Loop through each cluster and plot the cities
+        for i, cluster_info in enumerate(self.clusters_list):
+            # Extract cluster details
+            assigned_cities = cluster_info['assigned_cities']
+            medoid_index = cluster_info['medoid']
+            
+            # Get the x and y coordinates of the assigned cities
+            x_coords = self.cities[assigned_cities, 0]
+            y_coords = self.cities[assigned_cities, 1]
+            
+            # Plot cities in the cluster with a unique color
+            # I want large color distinction between clusters
+
+            plt.scatter(x_coords, y_coords, label=f"Cluster {i}", color=colors[i], alpha=0.6)
+            
+            # Highlight the medoid in each cluster
+            medoid_x = self.cities[medoid_index, 0]
+            medoid_y = self.cities[medoid_index, 1]
+            plt.scatter(medoid_x, medoid_y, color=colors[i], edgecolor="black", s=150, marker="X", label=f"Medoid {i}")
+
+        # Add legend, title, and show plot
+        plt.title("Clusters with Medoids Highlighted")
+        plt.xlabel("X Coordinate")
+        plt.ylabel("Y Coordinate")
+        plt.legend()
+        plt.show()
+        
+    
+    def plot_cities(self):
+        '''
+        - Plot the cities
+        '''
+        print("\n---------- Plotting Cities: ------")
+        '''
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=self.cities[:,0],y=self.cities[:,1],mode='markers'))
+        fig.update_layout(title='Cities')
+        fig.show()
+
+        '''
+
+        #make me the plot of teh cities using matplotlib
+        #plot using seaborn
+
+        sns.scatterplot(x=self.cities[:,0],y=self.cities[:,1])
+        plt.title("Cities")
+        plt.show()
+
+    def show_clusters(self,clusters_list):
+        '''
+        - Show the clusters
+        '''
+        print("\n---------- Clusters: ------")
+        self.add_clusters(clusters_list)
+        self.plot_clusters()
+        
+

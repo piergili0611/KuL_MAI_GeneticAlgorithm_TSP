@@ -1,6 +1,7 @@
 import Reporter
 import numpy as np
 from Evol_algorithm_K import GA_K
+from algorithm import algorithm
 
 # Modify the class name to match your student number.
 class r0818807:
@@ -8,18 +9,44 @@ class r0818807:
 	def __init__(self):
 		self.reporter = Reporter.Reporter(self.__class__.__name__)
 		self.num_simulations_to_run = 2
+		self.distanceMatrix = None
+		self.algorithm = None
 
-	def k_means_algorithm(self, filename):
+	def load_distance_matrix(self, filename):
 		file = open(filename)
 		distanceMatrix = np.loadtxt(file, delimiter=",")
 		file.close()
+		self.distanceMatrix = distanceMatrix
+
+	def load_algorithm(self):
+		self.algorithm = algorithm()
 		
 
-		model = GA_K(seed=42)
-		model.set_distance_matrix(distanceMatrix)
-		#model.k_means_distanced(distance_matrix=distanceMatrix)
-		#model.iterative_refinement(distance_matrix=distanceMatrix)
-		model.k_medoids_clustering(k=int(model.gen_size/10),min_cluster_size=int((model.gen_size/10)/10))
+	def run_k_means_algorithm(self, filename):
+		self.load_distance_matrix(filename)
+
+		# 1) Create algorithm object and set distance matrix
+		self.load_algorithm()
+		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+
+		# 2) Add K_clusters model
+		self.algorithm.add_K_clusters_model()
+
+		# 3) Run the K_clusters model
+		self.algorithm.run_k_cluster_model()
+
+	def test_k_means_algorithm(self, filename):
+		self.load_distance_matrix(filename)
+
+		# 1) Create algorithm object and set distance matrix
+		self.load_algorithm()
+		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+
+		# 2) ACreate cities and test the cluster
+		self.algorithm.test_k_cluster_model()
+	
+
+		
 
 		
 
