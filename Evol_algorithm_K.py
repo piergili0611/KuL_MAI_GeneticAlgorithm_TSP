@@ -7,7 +7,7 @@ class GA_K:
 
     def __init__(self,seed=None,mutation_prob = 0.001,elitism_percentage = 20):
         #model_key_parameters
-        self.k_tournament_k = 0
+        self.k_tournament_k = 3
         self.population_size = 0.0
         self.mutation_rate = mutation_prob
         self.elistism = 25                        #Elitism rate as a percentage
@@ -22,10 +22,38 @@ class GA_K:
         if seed is not None:
             np.random.seed(seed)    
         
-        pass
+        
+
+    def run_model(self):
+        self.set_initialization()
+        yourConvergenceTestsHere = False
+        num_iterations = 500
+        iterations = 0
+        while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
+            '''
+            meanObjective = 0
+            bestObjective = 0.0
+            bestSolution = np.array([1,2,3,4,5])
+            '''
+            iterations += 1
+            #print(f"\n Iteration number {iterations}")
+            parents = self.selection_k_tournament(num_individuals=self.population_size)    
+            offspring = self.crossover_singlepoint_population(parents)
+            offspring_mutated = self.mutation_singlepoint_population(offspring)
+
+            self.eliminate_population(population=self.population, offsprings=offspring_mutated)
+            #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
+            meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
+            yourConvergenceTestsHere = False
+
+        self.plot_fitness_dynamic()
+        return 0
+
+
+    
 
     def print_model_info(self):
-        print("------ Model key parameters -------")
+        print("------ self key parameters -------")
         print(f"\n Population size: {self.population_size} \n Mutation rate: {self.mutation_rate} \n  K_size: {self.k_tournament_k} \n")
 
     def set_distance_matrix(self,distance_matrix):
@@ -38,7 +66,7 @@ class GA_K:
         self.population_size = 1*self.gen_size
         self.k_tournament_k = int((3/100)*self.population_size)
         #print(f"Distance matrix is {self.distance_matrix}")
-        #print(f"Gen size is {self.gen_size}")
+        print(f"Gen size is {self.gen_size}")
 
 
 
@@ -411,12 +439,16 @@ class GA_K:
         '''
 
         self.population = np.array([np.random.permutation(self.gen_size) for _ in range(self.population_size)])
-        #print(f"Population shape --> {np.shape(self.population)} \n Population is : {self.population[1]}" )
         self.fitness = self.calculate_fitness(self.population)
+        #print(f"\n Initial Population: {self.population}")
+        #print(f"\n Initial Fitness: {self.fitness}")
         self.print_model_info()
 
 
     def selection_k_tournament(self, num_individuals, k=3):
+       #print(f"\n Population size: {self.population_size}")
+        #print(f"\n K size: {k}")
+        #print(f"\n Number of individuals: {num_individuals}")
         # Step 1: Randomly choose k individuals for each tournament
         tournament_indices = np.random.choice(self.population_size, size=(num_individuals, k), replace=True)
         #print(f"\n tournament indices: {tournament_indices}")

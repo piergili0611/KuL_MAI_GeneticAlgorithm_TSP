@@ -12,6 +12,7 @@ class cities:
         self.num_cities = num_cities  
         self.cities = self.generate_cities()  
         self.clusters_list = None
+        self.distance_matrix_cluster = []
 
     def print_model(self):
         '''
@@ -44,6 +45,40 @@ class cities:
                 distanceMatrix[i,j] = np.linalg.norm(self.cities[i]-self.cities[j])
         self.distanceMatrix = distanceMatrix
         return distanceMatrix
+
+    def generate_distance_matrix_cluster(self):
+        '''
+        - Generate the distance matrix for the clusters
+        '''
+        print("\n---------- Generating Distance Matrix for Clusters: ------")
+        #print(f"   * Model Info:")
+        #print(f"       - Number of clusters: {len(self.clusters_list)}")
+        #print(f"       - Clusters: {self.clusters_list}")
+        #print(f"       - Cities [0]: {self.distanceMatrix.shape[0]}")
+        #print(f"       - Cities [1]: {self.distanceMatrix.shape[1]}")
+
+        assigned_cities_list = [cluster['assigned_cities'] for cluster in self.clusters_list]
+        
+        for cities in assigned_cities_list:
+            num_cities = len(cities)
+            distanceMatrix = np.zeros((num_cities,num_cities))
+            #print(f"Number of cities: {num_cities}")
+            #print(f"Cities: {cities}")
+            row = 0
+            for i in cities:
+                column = 0
+                for j in cities:
+                    dist = self.distanceMatrix[i,j]
+                    #print(f"Distance between city {i} and city {j}: {dist}")
+                    distanceMatrix[row,column] = dist
+                    column += 1
+                row += 1
+            #print(f"Distance matrix: {distanceMatrix}")
+            self.distance_matrix_cluster.append(distanceMatrix)
+        
+     
+        return self.distance_matrix_cluster
+
     
 
     def add_clusters(self,clusters_list):

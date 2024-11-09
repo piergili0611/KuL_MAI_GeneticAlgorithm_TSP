@@ -14,6 +14,8 @@ class algorithm:
         self.GA_level1_model = None
         self.K_clusters_model = None
         self.distanceMatrix = None
+        self.clusters_list = []
+        self.distance_matrix_cluster_list = []
         
 
         #To check k_clusterl model
@@ -44,30 +46,56 @@ class algorithm:
         model = k_clusters(distance_matrix=self.distance_matrix)
         self.K_clusters_model = model
 
-    def add_GA_level1_model(self,mutation_prob=0.008):
+    def add_GA_level1_model(self,distance_matrix,mutation_prob=0.008):
         '''
         - Add the GA model
         '''
         model = GA_K(mutation_prob=mutation_prob,seed=42)
-        model.set_distance_matrix(self.distance_matrix)
+        model.set_distance_matrix(distance_matrix)
         self.GA_level1_model = model
+
+
+    def run_algorithm(self):
+        '''
+        - Run the algorithm
+        '''
+        distance_matrix = self.test_k_cluster_model()
+        
+        
+        assigned_cities_list = [cluster['assigned_cities'] for cluster in self.cluster_list]
+        counter = 0
+        #print(f"Assigned cities list: {assigned_cities_list}")
+        #print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}")
+        for cities in assigned_cities_list:
+            #print(f"Cities: {cities}")
+            print(f"Len Distance matrix cluster list: {len(self.distance_matrix_cluster_list)}")
+            distance_matrix = self.distance_matrix_cluster_list[counter]
+            self.add_GA_level1_model(distance_matrix=distance_matrix)
+            self.run_GA_level1_model(cities)
+            counter += 1
+
+    def run_GA_level1_model(self,cities):
+        '''
+        - Run the GA model
+        '''
+        self.GA_level1_model.run_model()
+    
 
     def run_k_cluster_model(self,model=None):
         '''
         - Run the k_cluster also
         '''
 
-        
         if model:
             num_cities = int(model.num_cities)
-            num_clusters = int(num_cities/10)
-            min_cluster_size = int(num_cities/100)
+            num_clusters = int(num_cities/20)
+            min_cluster_size = int(num_cities/10)
             model.run_model( k=num_clusters, min_cluster_size=min_cluster_size) 
             cluster_list = model.clusters_list
         else:
             num_cities = int(self.K_clusters_model.num_cities)
-            num_clusters = int(num_cities/10)
-            min_cluster_size = int(num_cities/100)
+            num_clusters = int(num_cities/20)
+            min_cluster_size = int(num_cities/10)
             self.K_clusters_model.run_model( k=num_clusters, min_cluster_size=min_cluster_size)
             cluster_list = self.K_clusters_model.clusters_list
         return cluster_list
@@ -97,8 +125,14 @@ class algorithm:
         self.add_cities_model()
         self.run_city_model()
         distance_matrix = self.cities_model.distanceMatrix
+        
+        
         K_cluster_model = k_clusters(distance_matrix=distance_matrix)
-        cluster_list = self.run_k_cluster_model(K_cluster_model)
+        self.cluster_list = self.run_k_cluster_model(K_cluster_model)
+        
 
         # 2) Add the clusters to the cities model and plot them
-        self.cities_model.show_clusters(cluster_list)
+        self.cities_model.show_clusters(self.cluster_list)
+        self.distance_matrix_cluster_list = self.cities_model.generate_distance_matrix_cluster()
+        print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}")
+        return distance_matrix

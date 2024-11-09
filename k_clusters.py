@@ -11,7 +11,7 @@ class k_clusters:
         self.distance_matrix = distance_matrix
         self.num_cities = distance_matrix.shape[0]
         self.clusters_list = []
-        
+
 
     def print_info_run_model(self,k,min_cluster_size):
         '''
@@ -285,8 +285,51 @@ class k_clusters:
         # We will need to modify clusters, so we will create a new list for valid clusters
         new_clusters = []
         new_labels = np.copy(labels)
+        k_new = k
+        cluster_idx = 0
         
         # We need to loop over the clusters using the original `clusters` list length
+        while cluster_idx < k_new:
+            # Find the cities assigned to the current cluster
+            print(f"\nCluster {cluster_idx}:")
+            
+            cluster_cities = np.where(new_labels == clusters[cluster_idx])[0]
+            
+            # If the cluster is empty or has fewer cities than the minimum size
+            if len(cluster_cities) < min_cluster_size:
+                medoid = clusters[cluster_idx]
+                print(f"Cluster {cluster_idx} with medoid: {medoid} is too small with number of cities {len(cluster_cities)} or empty, reassigning cities.")
+                
+                # For each city in this cluster, find the closest valid medoid
+                for city in cluster_cities:
+                    min_distance = np.inf
+                    best_medoid = -1
+                    
+                    # Find the closest medoid that is not the current one
+                    for other_cluster_idx in range(k):
+                        if other_cluster_idx != cluster_idx:
+                            distance_to_medoid = distance_matrix[city, clusters[other_cluster_idx]]
+                            # Ensure that we don't consider infinite distances
+                            if distance_to_medoid != np.inf and distance_to_medoid < min_distance:
+                                min_distance = distance_to_medoid
+                                best_medoid = clusters[other_cluster_idx]
+                    
+                    # Reassign the city to the closest cluster
+                    new_labels[city] = best_medoid
+                    print(f"City {city} reassigned to medoid {best_medoid} with distance {min_distance}.")
+                # Do not add the current cluster to the new_clusters list (remove it)
+                k_new -= 1
+
+            else:
+                # If the cluster is valid (not empty or too small), keep it
+                new_clusters.append(clusters[cluster_idx])
+                
+
+            cluster_idx += 1
+
+
+
+        '''
         for cluster_idx in range(k):
             # Find the cities assigned to the current cluster
             cluster_cities = np.where(labels == clusters[cluster_idx])[0]
@@ -314,9 +357,15 @@ class k_clusters:
                     new_labels[city] = best_medoid
                     print(f"City {city} reassigned to medoid {best_medoid} with distance {min_distance}.")
                 # Do not add the current cluster to the new_clusters list (remove it)
+
             else:
                 # If the cluster is valid (not empty or too small), keep it
                 new_clusters.append(clusters[cluster_idx])
+
+
+        '''
+
+
            
 
         # We may have fewer clusters after removal, update k accordingly
@@ -325,6 +374,17 @@ class k_clusters:
         #print(f"New Cluster Assignments: {new_labels}")
         #print(f"New Clusters: {new_clusters}")
         print(f"New Number of Cities: {len(new_labels)}")
+        self.clusters_list.clear()
+        for cluster in range(k):
+            cluster_cities = np.where(new_labels == new_clusters[cluster])[0]
+            intra_cluster_distance = 0
+            print(f"\nCluster {cluster}:")
+            print(f"  Medoid: {new_clusters[cluster]}")
+            print(f"  Number of Cities: {len(cluster_cities)}")
+            print(f"  Assigned Cities: {cluster_cities}")
+            print(f"  Intra-Cluster Distance: {intra_cluster_distance}")
+            cluster_info = {"cluster": cluster, "medoid": clusters[cluster], "num_cities": len(cluster_cities), "assigned_cities": cluster_cities, "intra_cluster_distance": intra_cluster_distance}
+            self.clusters_list.append(cluster_info)
 
         # Return the updated clusters and labels
         return new_clusters, new_labels, k

@@ -11,8 +11,10 @@ class r0818807:
 		self.num_simulations_to_run = 2
 		self.distanceMatrix = None
 		self.algorithm = None
+		self.filename = None
 
 	def load_distance_matrix(self, filename):
+		self.filename = filename
 		file = open(filename)
 		distanceMatrix = np.loadtxt(file, delimiter=",")
 		file.close()
@@ -44,6 +46,15 @@ class r0818807:
 
 		# 2) ACreate cities and test the cluster
 		self.algorithm.test_k_cluster_model()
+
+	def run(self,filename):
+		self.load_distance_matrix(filename)
+
+		# 1) Create algorithm object and set distance matrix
+		self.load_algorithm()
+		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+		self.algorithm.run_algorithm()
+
 	
 
 		
