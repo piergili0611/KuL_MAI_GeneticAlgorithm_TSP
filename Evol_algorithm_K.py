@@ -5,8 +5,9 @@ import seaborn as sns
 
 class GA_K:
 
-    def __init__(self,seed=None,mutation_prob = 0.001,elitism_percentage = 20):
+    def __init__(self,cities,seed=None ,mutation_prob = 0.001,elitism_percentage = 20):
         #model_key_parameters
+        self.cities = cities 
         self.k_tournament_k = 3
         self.population_size = 0.0
         self.mutation_rate = mutation_prob
@@ -17,6 +18,7 @@ class GA_K:
         self.best_objective = 0.0
         self.mean_fitness_list = []
         self.best_fitness_list = [] 
+        
 
         #Random seed
         if seed is not None:
@@ -46,15 +48,39 @@ class GA_K:
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
             yourConvergenceTestsHere = False
 
+        self.print_best_solution()
         self.plot_fitness_dynamic()
         return 0
 
 
-    
+    def retieve_order_cities(self,best_solution):
+
+        '''
+        - Retrieve the order of the cities
+        '''
+        #print(f"\n Best solution is : {best_solution}")
+        #print(f"\n Cities are : {self.cities}")
+        
+        self.best_solution_cities = self.cities[best_solution]
+
+        #print(f"\n Best solution cities are : {self.best_solution_cities}")
+
+        
 
     def print_model_info(self):
-        print("------ self key parameters -------")
-        print(f"\n Population size: {self.population_size} \n Mutation rate: {self.mutation_rate} \n  K_size: {self.k_tournament_k} \n")
+        print("\n------------- GA_Level1: -------------")
+        print(f"   * Model Info:")
+        print(f"       - Population Size: {self.population_size}")
+        print(f"       - Number of cities: {self.gen_size}")
+        print(f"       - Cities: {self.cities}")
+        print(f"   * Model Parameters:")
+        print(f"       - K: {self.k_tournament_k}")
+        print(f"       - Mutation rate: {self.mutation_rate}")
+        print(f"       - Elitism percentage: {self.elistism} %")
+        print(f"   * Running model:")
+        
+
+        
 
     def set_distance_matrix(self,distance_matrix):
         '''
@@ -66,7 +92,7 @@ class GA_K:
         self.population_size = 1*self.gen_size
         self.k_tournament_k = int((3/100)*self.population_size)
         #print(f"Distance matrix is {self.distance_matrix}")
-        print(f"Gen size is {self.gen_size}")
+        #print(f"Gen size is {self.gen_size}")
 
 
 
@@ -782,8 +808,16 @@ class GA_K:
         self.best_fitness_list.append(self.best_objective)  
         best_index = np.argmin(self.fitness)
         best_solution = self.population[best_index]
+        self.retieve_order_cities(best_solution)    
         #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution --> {best_solution}")
         return self.mean_objective,self.best_objective,best_solution
+    
+    def print_best_solution(self):
+        '''
+        - Print the best solution
+        '''
+        
+        print(f"\n Best solution is : {self.best_objective} \n Best solution cities are : {self.best_solution_cities}")
     
     
 

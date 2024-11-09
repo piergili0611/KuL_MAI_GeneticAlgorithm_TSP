@@ -46,11 +46,11 @@ class algorithm:
         model = k_clusters(distance_matrix=self.distance_matrix)
         self.K_clusters_model = model
 
-    def add_GA_level1_model(self,distance_matrix,mutation_prob=0.008):
+    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.008):
         '''
         - Add the GA model
         '''
-        model = GA_K(mutation_prob=mutation_prob,seed=42)
+        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42)
         model.set_distance_matrix(distance_matrix)
         self.GA_level1_model = model
 
@@ -61,17 +61,19 @@ class algorithm:
         '''
         distance_matrix = self.test_k_cluster_model()
         
-        
         assigned_cities_list = [cluster['assigned_cities'] for cluster in self.cluster_list]
         counter = 0
         #print(f"Assigned cities list: {assigned_cities_list}")
+        #print(f"Cities cluster list self: {self.cities_cluster_list}")
         #print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}")
-        for cities in assigned_cities_list:
+        for cities in self.cities_cluster_list:
             #print(f"Cities: {cities}")
-            print(f"Len Distance matrix cluster list: {len(self.distance_matrix_cluster_list)}")
+            #print(f"Len Distance matrix cluster list: {len(self.distance_matrix_cluster_list)}")
             distance_matrix = self.distance_matrix_cluster_list[counter]
-            self.add_GA_level1_model(distance_matrix=distance_matrix)
+            self.add_GA_level1_model(cities=cities,distance_matrix=distance_matrix)
             self.run_GA_level1_model(cities)
+            self.cities_model.add_cities_sequence(self.GA_level1_model.best_solution_cities)
+            self.cities_model.plot_clusters_sequence(city_sequence=True)
             counter += 1
 
     def run_GA_level1_model(self,cities):
@@ -133,6 +135,6 @@ class algorithm:
 
         # 2) Add the clusters to the cities model and plot them
         self.cities_model.show_clusters(self.cluster_list)
-        self.distance_matrix_cluster_list = self.cities_model.generate_distance_matrix_cluster()
-        print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}")
+        self.distance_matrix_cluster_list,self.cities_cluster_list = self.cities_model.generate_distance_matrix_cluster()
+        print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}& Cities cluster list: {self.cities_cluster_list}")
         return distance_matrix

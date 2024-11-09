@@ -13,6 +13,10 @@ class cities:
         self.cities = self.generate_cities()  
         self.clusters_list = None
         self.distance_matrix_cluster = []
+        self.cities_cluster_list = []
+        self.cities_sequence_list = []
+        np.random.seed(42)
+
 
     def print_model(self):
         '''
@@ -60,12 +64,14 @@ class cities:
         assigned_cities_list = [cluster['assigned_cities'] for cluster in self.clusters_list]
         
         for cities in assigned_cities_list:
+            self.cities_cluster_list.append(cities)
             num_cities = len(cities)
             distanceMatrix = np.zeros((num_cities,num_cities))
             #print(f"Number of cities: {num_cities}")
             #print(f"Cities: {cities}")
             row = 0
             for i in cities:
+                
                 column = 0
                 for j in cities:
                     dist = self.distanceMatrix[i,j]
@@ -77,7 +83,7 @@ class cities:
             self.distance_matrix_cluster.append(distanceMatrix)
         
      
-        return self.distance_matrix_cluster
+        return self.distance_matrix_cluster, self.cities_cluster_list
 
     
 
@@ -86,6 +92,12 @@ class cities:
         - Add the clusters
         '''
         self.clusters_list = clusters_list
+
+    def add_cities_sequence(self,cities_sequence_list):
+        '''
+        - Add the cities sequence
+        '''
+        self.cities_sequence_list = cities_sequence_list
 
     def plot_clusters(self):
         """
@@ -161,5 +173,67 @@ class cities:
         print("\n---------- Clusters: ------")
         self.add_clusters(clusters_list)
         self.plot_clusters()
+
+    
+    def plot_clusters_sequence(self, city_sequence=None):
+        """
+        Plot each cluster with a different color and highlight the medoid.
+        Optionally, show the sequence of cities with arrows.
+        """
+        print("\n---------- Plotting Clusters: ------")
         
+        # Choose a color palette with strong distinctions between colors
+        num_clusters = len(self.clusters_list)
+        if num_clusters <= 10:
+            colors = sns.color_palette("Dark2", num_clusters)  
+        elif num_clusters <= 12:
+            colors = sns.color_palette("Set1", num_clusters)  
+        else:
+            colors = sns.color_palette("hsv", num_clusters)
+        
+        # Create a new figure
+        plt.figure(figsize=(10, 8))
+        
+        # Loop through each cluster and plot the cities
+        for i, cluster_info in enumerate(self.clusters_list):
+            assigned_cities = cluster_info['assigned_cities']
+            medoid_index = cluster_info['medoid']
+            
+            # Get the x and y coordinates of the assigned cities
+            x_coords = self.cities[assigned_cities, 0]
+            y_coords = self.cities[assigned_cities, 1]
+            
+            # Plot cities in the cluster with a unique color
+            plt.scatter(x_coords, y_coords, label=f"Cluster {i}", color=colors[i], alpha=0.6)
+            
+            # Highlight the medoid in each cluster
+            medoid_x = self.cities[medoid_index, 0]
+            medoid_y = self.cities[medoid_index, 1]
+            plt.scatter(medoid_x, medoid_y, color=colors[i], edgecolor="black", s=150, marker="X", label=f"Medoid {i}")
+
+        # If a city sequence is provided, plot arrows indicating the path
+        if city_sequence:
+            sequence = self.cities_sequence_list
+            for j in range(len(sequence) - 1):
+                start_city = sequence[j]
+                end_city = sequence[j + 1]
+                
+                # Get start and end coordinates for the arrow
+                start_x, start_y = self.cities[start_city]
+                end_x, end_y = self.cities[end_city]
+                
+                # Plot an arrow from start to end city
+                plt.arrow(start_x, start_y, end_x - start_x, end_y - start_y, 
+                        head_width=0.03, length_includes_head=True, color="black", alpha=0.8)
+        
+        # Add legend, title, and show plot
+        plt.title("Clusters with Medoids and City Sequence")
+        plt.xlabel("X Coordinate")
+        plt.ylabel("Y Coordinate")
+        plt.legend()
+        plt.show()
+
+
+        
+            
 
