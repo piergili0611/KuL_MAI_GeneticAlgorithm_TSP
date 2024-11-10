@@ -50,6 +50,7 @@ class GA_K:
 
         self.print_best_solution()
         self.plot_fitness_dynamic()
+        
         return 0
 
 
@@ -915,17 +916,19 @@ class GA_K:
 
 
     def plot_fitness(self):
-        #print(f"IS IT HERE")
-        plt.figure(figsize=(10, 5))
-        plt.plot(self.best_fitness_list, label='Best Distance', color='blue', marker='o')
-        plt.plot(self.mean_fitness_list, label='Mean Distance', color='orange', marker='x')
+        # Create a figure and axis object
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        # Plot the best and mean fitness values
+        ax.plot(self.best_fitness_list, label='Best Distance', color='blue', marker='o')
+        ax.plot(self.mean_fitness_list, label='Mean Distance', color='orange', marker='x')
 
         # Get the last iteration's best and mean fitness
         last_best_fitness = self.best_fitness_list[-1]
         last_mean_fitness = self.mean_fitness_list[-1]
-        
+
         # Add text to the plot for the last iteration's fitness
-        plt.text(x=len(self.best_fitness_list) - 1, 
+        ax.text(x=len(self.best_fitness_list) - 1, 
                 y=last_best_fitness, 
                 s=f'Best: {last_best_fitness}\nMean: {last_mean_fitness}', 
                 fontsize=10, 
@@ -933,12 +936,17 @@ class GA_K:
                 horizontalalignment='right',
                 bbox=dict(facecolor='white', alpha=0.5, edgecolor='black'))
 
-        plt.title(f'Distance over Iterations with mutation rate {self.mutation_rate*100} %')
-        plt.xlabel('Iterations')
-        plt.ylabel('Distance')
-        plt.legend()
-        plt.grid()
-        plt.show()
+        # Set titles and labels
+        ax.set_title(f'Distance over Iterations with mutation rate {self.mutation_rate * 100} %')
+        ax.set_xlabel('Iterations')
+        ax.set_ylabel('Distance')
+
+        # Show the legend and grid
+        ax.legend()
+        ax.grid()
+
+        # Return the figure object
+        
 
 
     def plot_fitness_dynamic(self):
@@ -993,3 +1001,5 @@ class GA_K:
 
         # Show the plot
         fig.show()
+
+        

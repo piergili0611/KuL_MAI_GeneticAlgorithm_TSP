@@ -107,6 +107,7 @@ class cities:
         
         # Choose a color palette with strong distinctions between colors
         num_clusters = len(self.clusters_list)
+        print(f"Number of clusters: {num_clusters}")
         if num_clusters <= 10:
             colors = sns.color_palette("Dark2", num_clusters)  # 'tab10' has 10 highly distinct colors
         elif num_clusters <= 12:
@@ -179,6 +180,14 @@ class cities:
         """
         Plot each cluster with a different color and highlight the medoid.
         Optionally, show the sequence of cities with arrows.
+        Returns the figure object to allow storing and further use.
+        """
+        print("\n---------- Plotting Clusters: ------")
+        
+        # Choose a color palette with strong distinctions between colors
+        """
+        Plot each cluster with a different color and highlight the medoid.
+        Optionally, show the sequence of cities with arrows.
         """
         print("\n---------- Plotting Clusters: ------")
         
@@ -232,8 +241,3 @@ class cities:
         plt.ylabel("Y Coordinate")
         plt.legend()
         plt.show()
-
-
-        
-            
-

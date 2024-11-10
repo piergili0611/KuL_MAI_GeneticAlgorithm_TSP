@@ -47,13 +47,15 @@ class r0818807:
 		# 2) ACreate cities and test the cluster
 		self.algorithm.test_k_cluster_model()
 
-	def run(self,filename):
+	def run(self,filename,clusters=True):
 		self.load_distance_matrix(filename)
 
 		# 1) Create algorithm object and set distance matrix
 		self.load_algorithm()
 		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
-		self.algorithm.run_algorithm()
+		
+		self.algorithm.run_algorithm(clusters=clusters)
+		
 
 	
 
