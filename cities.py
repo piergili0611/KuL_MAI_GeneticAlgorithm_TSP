@@ -175,19 +175,11 @@ class cities:
         self.add_clusters(clusters_list)
         self.plot_clusters()
 
-    
     def plot_clusters_sequence(self, city_sequence=None):
         """
         Plot each cluster with a different color and highlight the medoid.
         Optionally, show the sequence of cities with arrows.
         Returns the figure object to allow storing and further use.
-        """
-        print("\n---------- Plotting Clusters: ------")
-        
-        # Choose a color palette with strong distinctions between colors
-        """
-        Plot each cluster with a different color and highlight the medoid.
-        Optionally, show the sequence of cities with arrows.
         """
         print("\n---------- Plotting Clusters: ------")
         
@@ -219,6 +211,15 @@ class cities:
             medoid_x = self.cities[medoid_index, 0]
             medoid_y = self.cities[medoid_index, 1]
             plt.scatter(medoid_x, medoid_y, color=colors[i], edgecolor="black", s=150, marker="X", label=f"Medoid {i}")
+            
+            # Add the number of cities in the cluster
+            num_cities = len(assigned_cities)
+            plt.text(medoid_x, medoid_y, f'{num_cities} cities', color=colors[i], ha='center', va='center', fontweight='bold')
+        
+        # Add labels to each city (by its index)
+        for i, city in enumerate(self.cities):
+            city_x, city_y = city
+            plt.text(city_x, city_y, str(i), color='black', ha='center', va='center', fontweight='bold', fontsize=9)
 
         # If a city sequence is provided, plot arrows indicating the path
         if city_sequence:
@@ -241,3 +242,5 @@ class cities:
         plt.ylabel("Y Coordinate")
         plt.legend()
         plt.show()
+
+

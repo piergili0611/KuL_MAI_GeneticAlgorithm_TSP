@@ -3,9 +3,10 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import seaborn as sns
 
+
 class GA_K_L2:
 
-    def __init__(self,clusters_solutions_matrix,seed=None ,mutation_prob = 0.001,elitism_percentage = 20):
+    def __init__(self,clusters_solutions_matrix,cities_model,seed=None ,mutation_prob = 0.001,elitism_percentage = 20):
         #model_key_parameters
         #self.cities = cities 
         self.k_tournament_k = 3
@@ -23,6 +24,9 @@ class GA_K_L2:
 
         self.num_clusters = len(clusters_solutions_matrix)
         self.possible_entryAndExit_points_list = []
+
+      
+        self.cities_model = cities_model
         
 
         #Random seed
@@ -32,7 +36,6 @@ class GA_K_L2:
         
 
     def run_model(self):
-        self.generate_possible_entries_and_exit_points()
         self.set_initialization()
         yourConvergenceTestsHere = False
         num_iterations = 500
@@ -45,11 +48,11 @@ class GA_K_L2:
             '''
             iterations += 1
             #print(f"\n Iteration number {iterations}")
-            parents = self.selection_k_tournament(num_individuals=self.population_size)    
-            offspring = self.crossover_singlepoint_population(parents)
-            offspring_mutated = self.mutation_singlepoint_population(offspring)
+            parents_cluster, parents_cities = self.selection_k_tournament(num_individuals=self.population_size)    
+            offspring_cluster= self.crossover_singlepoint_population(parents_cluster)
+            offspring_mutated_cluster,offspring_mutated_cities = self.mutation_singlepoint_population(offspring_cluster)
 
-            self.eliminate_population(population=self.population, offsprings=offspring_mutated)
+            self.eliminate_population(population=self.population, offsprings_cluster = offspring_mutated_cluster, offsprings_cities = offspring_mutated_cities)
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
             yourConvergenceTestsHere = False
@@ -58,6 +61,9 @@ class GA_K_L2:
         self.plot_fitness_dynamic()
         
         return 0
+    
+
+
 
 
     def retieve_order_cities(self,best_solution):
@@ -97,10 +103,112 @@ class GA_K_L2:
         self.distance_matrix = self.check_inf(distance_matrix=distance_matrix,replace_value=100000)
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
-        self.population_size = 1*self.gen_size
+        #self.population_size = 1*self.gen_size
+        self.population_size = 5
         self.k_tournament_k = int((3/100)*self.population_size)
         print(f"Distance matrix is {self.distance_matrix}")
         #print(f"Gen size is {self.gen_size}")
+
+
+
+
+    
+
+    def greedyMerge_populationClusters(self,population):
+        """
+        Merges clusters in a greedy manner by iterating through the solution array,
+        starting from the first two clusters and merging them one by one.
+
+        Parameters:
+        - solution (np.ndarray): An array representing the order of cluster indices.
+        - distance_matrix (np.ndarray): A 2D numpy array where distance_matrix[i, j] gives
+                                        the distance between city i and city j.
+
+        Returns:
+        - merged_cluster (np.ndarray): A single array representing the merged cluster.
+        """
+        # Start with the first cluster
+        #print(f"\n ----------------- Greedy Merge -----------------")
+        #print(f"\n Clusters solutions : {self.clusters_solution_matrix}")
+        distance_matrix = self.distance_matrix
+        cluster_inital = 0
+        population_merged = []
+        for solution in population:
+            num_clusters = len(solution)
+        
+
+            # This will store the cities as they are merged
+            merged_solutions = []
+
+            #print(f"\n Solution is : {solution}")
+            
+            # Iterate over the clusters and merge them greedily
+            for cluster_idx in range(0, num_clusters - 1):
+                # Extract the current cluster's cities
+                if cluster_idx == 0:
+                    current_cluster_cities = self.clusters_solution_matrix[solution[cluster_idx]]
+                    num_cities1 = len(current_cluster_cities)
+                else:
+                    current_cluster_cities = merged_solutions[-1]  # Last merged cluster
+                    num_cities1 = len(current_cluster_cities)
+
+                # Get the next cluster's cities
+                next_cluster_cities = self.clusters_solution_matrix[solution[cluster_idx + 1]]
+                num_cities2 = len(next_cluster_cities)
+                total_cities = num_cities1 + num_cities2
+
+                # Print for debugging
+                #print(f"\n Current cluster cities: {current_cluster_cities}")
+                #print(f"\n Next cluster cities: {next_cluster_cities}")
+
+                # Compute pairwise distances between all cities in the current and next cluster
+                dist_matrix = distance_matrix[np.ix_(current_cluster_cities, next_cluster_cities)]
+
+                # Find the pair of cities that have the minimum distance
+                min_dist_idx = np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
+                i, j = min_dist_idx  # Cities to be connected
+                
+                # Output the pair with the minimum distance
+            #print(f"Connecting city {current_cluster_cities[i]} with city {next_cluster_cities[j]}")
+
+                # Step 1: Remove the old edges between the closest cities in both clusters
+                #print(f"\n --- Merging Clusters ---")
+                #print(f"Removing edge between city {current_cluster_cities[i-1]} and city {current_cluster_cities[i]}")
+                #print(f"Removing edge between city {next_cluster_cities[j-1]} and city {next_cluster_cities[j]}")
+
+                # Step 2: Merge current cluster up to city[i], then add the connection to city[j]
+                #print(f"Adding cities from current cluster up to city {current_cluster_cities[i]}")
+                merged_cluster = current_cluster_cities[:i + 1]  # Include all cities before i
+
+                # Step 3: Add the second cluster, starting from city[j]
+                #print(f"Adding cities from next cluster, starting from city {next_cluster_cities[j]}")
+                merged_cluster = np.concatenate([merged_cluster, next_cluster_cities[j:]])
+
+                # Step 4: Add any remaining cities from the second cluster before city j
+                remaining_cities_from_next = next_cluster_cities[:j]
+                #print(f"Adding remaining cities from next cluster: {remaining_cities_from_next}")
+                merged_cluster = np.concatenate([merged_cluster, remaining_cities_from_next])
+
+                # Step 5: Add remaining cities from the first cluster after city[i]
+                #print(f"Adding remaining cities from current cluster after city {current_cluster_cities[i]}")
+                merged_cluster = np.concatenate([merged_cluster, current_cluster_cities[i + 1:]])
+
+                # After merging, print the final merged cluster
+                #print(f"Final merged cluster: {merged_cluster}")
+                #self.cities_model.add_cities_sequence(merged_cluster)
+                #self.cities_model.plot_clusters_sequence(city_sequence=True)   
+                merged_solutions.append(merged_cluster)
+            population_merged.append(merged_cluster)
+
+
+        return np.array(population_merged)
+       
+
+          
+
+           
+
+
 
 
 
@@ -207,49 +315,19 @@ class GA_K_L2:
         '''
        
         # 1) Initialize the population with random permutations of the number of clusters
-        clusters_arrays = np.array([np.random.permutation(self.num_clusters) for _ in range(self.population_size)])
-        #print(f"\n Initial Population Clusters: {clusters_arrays}")
-
-        # 2) Pre-allocate entry_exit_points array for the entire population
-        # Shape: (population_size, num_clusters, 2) where each cluster gets an entry-exit pair
-        entry_exit_points = np.zeros((self.population_size, self.num_clusters, 2), dtype=int)
-
-        # 3) Generate random valid entry-exit pairs for each cluster in each individual
-        for cluster in range(self.num_clusters):
-            # Get the number of valid pairs for this cluster
-            num_pairs = len(self.possible_entry_and_exit_points_list[cluster])
-
-            # For all individuals, sample random pairs for the current cluster
-            sampled_indices = np.random.choice(num_pairs, size=self.population_size, replace=True)  # Sample for all individuals
-
-            # Use the sampled indices to get the entry-exit pairs for each individual and cluster
-            selected_pairs = self.possible_entry_and_exit_points_list[cluster][sampled_indices]
-
-            # Assign the selected pairs to the corresponding positions in entry_exit_points
-            entry_exit_points[:, cluster] = selected_pairs
-
-        #print(f"\nEntry and Exit Points for Population:\n{entry_exit_points}")
-
-
-        #combine the clusters and the entry and exit points to create the population
-        self.population = [clusters_arrays,entry_exit_points] # Combine clusters and entry-exit points
-
+        self.population= np.array([np.random.permutation(self.num_clusters) for _ in range(self.population_size)])
         print(f"\n Initial Population: {self.population}")
-        print(f"\n Initial Population size: {self.population_size}")
-        print(f"\n Initial Population shape List: {len((self.population))}")
-        print(f"\n Initial Population shape of List of Clusters: {np.shape(self.population[0])}")
-        #print(f"\n       Initial Population List of Clusters: {(self.population[0])}")
-        print(f"\n Initial Population shape of List of Entry&Exit: {np.shape(self.population[1])}")
-        #print(f"\n       Initial Population List of Entry&Exit: {(self.population[1])}")
+        sol_merged_list = []
+        self.population_merged = self.greedyMerge_populationClusters(self.population)
+        print(f"\n Merged Population: {self.population_merged}")
+       
 
-        self.reconstruct_solution()
 
     
-
         #self.population = np.array([np.random.permutation(self.gen_size) for _ in range(self.population_size)])
-        #self.fitness = self.calculate_fitness(self.population)
+        self.fitness = self.calculate_fitness(self.population_merged)
         
-        #print(f"\n Initial Fitness: {self.fitness}")
+        print(f"\n Initial Fitness: {self.fitness}")
         self.print_model_info()
 
 
@@ -273,7 +351,10 @@ class GA_K_L2:
         best_selected_indices = tournament_indices[np.arange(num_individuals), best_indices_in_tournament]
 
         # Step 5: Return the selected individualsi
-        return self.population[best_selected_indices]
+        # print this self.population[best_selected_indices],self.population_merged[best_selected_indices]
+        #print(f"\n K_Tournament indices: {self.population[best_selected_indices]} and {self.population_merged[best_selected_indices]}")    
+
+        return self.population[best_selected_indices],self.population_merged[best_selected_indices]
     
     
     #make me a function that will select the best individuals from the population based on the k_tournament, given talso the fitness of that population
@@ -333,6 +414,8 @@ class GA_K_L2:
             children_population[(i + 1) % num_parents] = child2
 
         #print(f"\n CROSSOVER: Children Population is : {children_population[1]}" )
+
+    
         
         return children_population
     
@@ -414,8 +497,9 @@ class GA_K_L2:
             mutated_population[i] = self.mutation_singlepoint(population[i], mutation_rate)
 
         #print(f"\n MUTATION: Children Population is : {mutated_population[1]}" )
+        merged_mutated_population = self.greedyMerge_populationClusters(mutated_population) 
         
-        return mutated_population
+        return mutated_population,merged_mutated_population
 
     def mutation_singlepoint(self, individual, mutation_rate=0.8):
         # Number of genes in the individual
@@ -437,10 +521,9 @@ class GA_K_L2:
         #print(f"\n Mutated Individual is : {mutated_individual}")
         return mutated_individual
     
-    
-    
+   
 
-    def eliminate_population(self, population, offsprings):
+    def eliminate_population(self, population, offsprings_cluster,offsprings_cities):
         """
         Selects the best individuals from the combined population and offspring
         based on fitness.
@@ -455,10 +538,11 @@ class GA_K_L2:
         # Combine the original population with the offspring
         #print(f"\n Orginial --> {population}")
         #print(f"\n Offspring--> {offspring}")
-        combined_population = np.vstack((population, offsprings))
+        combined_population = np.vstack((population, offsprings_cluster))
+        combined_population_cities = np.vstack((self.population_merged, offsprings_cities))
 
         # Calculate fitness for the combined population
-        fitness_scores = self.calculate_fitness(offsprings)
+        fitness_scores = self.calculate_fitness(offsprings_cities)
         combined_fitness = np.hstack((self.fitness, fitness_scores))
         #print(f"\n Fitness V1--> {fitness_scores}")
        
@@ -470,6 +554,7 @@ class GA_K_L2:
 
         # Select the best individuals
         self.population = combined_population[best_indices]
+        self.population_merged = combined_population_cities[best_indices]
         self.fitness = combined_fitness[best_indices]
 
     #make me a elimnate population that will use my elitism percentage to keep the best individuals and the rest will be compute dvia a k_tournament fucntion 
@@ -590,7 +675,8 @@ class GA_K_L2:
         self.best_fitness_list.append(self.best_objective)  
         best_index = np.argmin(self.fitness)
         best_solution = self.population[best_index]
-        self.retieve_order_cities(best_solution)    
+        self.best_solution_merged = self.population_merged[best_index]
+        #self.retieve_order_cities(best_solution_merged)    
         #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution --> {best_solution}")
         return self.mean_objective,self.best_objective,best_solution
     
@@ -599,7 +685,7 @@ class GA_K_L2:
         - Print the best solution
         '''
         
-        print(f"\n Best solution is : {self.best_objective} \n Best solution cities are : {self.best_solution_cities}")
+        print(f"\n Best solution is : {self.best_objective} \n Best solution cities are : {self.best_solution_merged}")
     
     
 

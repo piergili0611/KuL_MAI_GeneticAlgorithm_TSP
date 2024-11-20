@@ -61,11 +61,11 @@ class algorithm:
         model.set_distance_matrix(distance_matrix)
         self.GA_level1_model = model
 
-    def add_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,mutation_prob=0.008):
+    def add_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,mutation_prob=0.1):
         '''
         - Add the GA model
         '''
-        model = GA_K_L2(clusters_solutions_matrix=cluster_solutions_matrix,mutation_prob=mutation_prob,seed=42)
+        model = GA_K_L2(clusters_solutions_matrix=cluster_solutions_matrix,cities_model=self.cities_model,mutation_prob=mutation_prob,seed=42)
         model.set_distance_matrix(distance_matrix)
         self.GA_level2_model = model
 
@@ -100,8 +100,8 @@ class algorithm:
             self.deltatime_cluster_list.append(delta_time)
 
             # 2) Add the cities sequence to the cities model and plot the clusters
-            self.cities_model.add_cities_sequence(self.GA_level1_model.best_solution_cities)
-            self.cities_model.plot_clusters_sequence(city_sequence=True)
+            #self.cities_model.add_cities_sequence(self.GA_level1_model.best_solution_cities)
+            #self.cities_model.plot_clusters_sequence(city_sequence=True)
             counter += 1
 
         self.plot_ExecutionTime_Clusters()
@@ -109,7 +109,31 @@ class algorithm:
 
         # 2) Create and run Higher level GA model
         self.add_GA_level2_model(distance_matrix=distance_matrix_global,cluster_solutions_matrix=self.clusters_solution_list)
+        time_start_GA_level1 = time.time()
         self.GA_level2_model.run_model()
+        time_end_GA_level1 = time.time()
+        delta_time = time_end_GA_level1-time_start_GA_level1
+        print(f"Time taken for GA level 2: {delta_time}")
+        final_solution = self.GA_level2_model.best_solution_merged
+
+        # 2) Plot teh resulting sequence
+        self.cities_model.add_cities_sequence(final_solution)
+        self.cities_model.plot_clusters_sequence(city_sequence=True)
+        self.check_city_solution(final_solution)
+
+    
+
+    #make me a function taht given a city solution will check what i sthe length (number of cities) and if each city is unique
+    def check_city_solution(self,city_solution):
+        '''
+        - Check the city solution
+        '''
+        num_cities = len(city_solution)
+        unique_cities = len(set(city_solution))
+        print(f"Number of cities: {num_cities} & Number of unique cities: {unique_cities}")
+        
+
+
         
 
 
