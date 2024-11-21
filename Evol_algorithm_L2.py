@@ -86,7 +86,7 @@ class GA_K_L2:
         print(f"       - Population Size: {self.population_size}")
         print(f"       - Number of cities: {self.gen_size}")
         print(f"       - Number of clusters: {self.num_clusters}")
-        print(f"       - Cluster Soluitions: {self.clusters_solution_matrix}")
+        #print(f"       - Cluster Solutions: {self.clusters_solution_matrix}")
         print(f"   * Model Parameters:")
         print(f"       - K: {self.k_tournament_k}")
         print(f"       - Mutation rate: {self.mutation_rate}")
@@ -106,7 +106,7 @@ class GA_K_L2:
         #self.population_size = 1*self.gen_size
         self.population_size = 5
         self.k_tournament_k = int((3/100)*self.population_size)
-        print(f"Distance matrix is {self.distance_matrix}")
+        #print(f"Distance matrix is {self.distance_matrix}")
         #print(f"Gen size is {self.gen_size}")
 
 
@@ -316,10 +316,10 @@ class GA_K_L2:
        
         # 1) Initialize the population with random permutations of the number of clusters
         self.population= np.array([np.random.permutation(self.num_clusters) for _ in range(self.population_size)])
-        print(f"\n Initial Population: {self.population}")
+        #print(f"\n Initial Population: {self.population}")
         sol_merged_list = []
         self.population_merged = self.greedyMerge_populationClusters(self.population)
-        print(f"\n Merged Population: {self.population_merged}")
+        #print(f"\n Merged Population: {self.population_merged}")
        
 
 
@@ -327,7 +327,7 @@ class GA_K_L2:
         #self.population = np.array([np.random.permutation(self.gen_size) for _ in range(self.population_size)])
         self.fitness = self.calculate_fitness(self.population_merged)
         
-        print(f"\n Initial Fitness: {self.fitness}")
+        #print(f"\n Initial Fitness: {self.fitness}")
         self.print_model_info()
 
 

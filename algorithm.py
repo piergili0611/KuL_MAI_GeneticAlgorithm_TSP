@@ -100,8 +100,8 @@ class algorithm:
             self.deltatime_cluster_list.append(delta_time)
 
             # 2) Add the cities sequence to the cities model and plot the clusters
-            #self.cities_model.add_cities_sequence(self.GA_level1_model.best_solution_cities)
-            #self.cities_model.plot_clusters_sequence(city_sequence=True)
+            self.cities_model.add_cities_sequence(self.GA_level1_model.best_solution_cities)
+            self.cities_model.plot_clusters_sequence(city_sequence=True)
             counter += 1
 
         self.plot_ExecutionTime_Clusters()
@@ -191,10 +191,6 @@ class algorithm:
         '''
         - Test the k_cluster model
         '''
-
-        
-        
-
         self.add_run_cities_model()
         distance_matrix = self.cities_model.distanceMatrix
         
@@ -210,7 +206,7 @@ class algorithm:
         # 2) Add the clusters to the cities model and plot them
         self.cities_model.show_clusters(self.cluster_list)
         self.distance_matrix_cluster_list,self.cities_cluster_list = self.cities_model.generate_distance_matrix_cluster()
-        print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}& Cities cluster list: {self.cities_cluster_list}")
+        #print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}& Cities cluster list: {self.cities_cluster_list}")
         return distance_matrix
     
     def add_run_cities_model(self):

@@ -236,7 +236,7 @@ class k_clusters:
             medoids = np.copy(new_medoids)
         
         # Print final clustering results
-        print("\nFinal Clustering Results:")
+        #print("\nFinal Clustering Results:")
         intra_cluster_distances = np.array(list(intra_cluster_distances_dict.values()))
         
 
@@ -251,11 +251,12 @@ class k_clusters:
             cluster_info = {"cluster": cluster, "medoid": medoids[cluster], "num_cities": len(cluster_cities), "assigned_cities": cluster_cities, "intra_cluster_distance": intra_cluster_distance}
             self.clusters_list.append(cluster_info)
             
-        self.verify_unique_cluster_assignment(labels, k)    
-        self.plot_intra_cluster_distances(distance_matrix, intra_cluster_distances, labels, medoids, k)
+        #self.verify_unique_cluster_assignment(labels, k)    
+        #self.plot_intra_cluster_distances(distance_matrix, intra_cluster_distances, labels, medoids, k)
         medoids, labels, k = self.handle_empty_or_small_clusters(distance_matrix, medoids, labels, k, min_cluster_size=min_cluster_size)
         intra_cluster_distances = self.calculate_intra_cluster_distance(distance_matrix, labels, medoids)    
         self.plot_intra_cluster_distances(distance_matrix, intra_cluster_distances, labels, medoids, k) 
+        self.verify_unique_cluster_assignment(labels, k)   
 
         return medoids, labels, intra_cluster_distances_dict
     
@@ -287,16 +288,20 @@ class k_clusters:
         new_labels = np.copy(labels)
         k_new = k
         cluster_idx = 0
+        deleted_clusters = []
         
         # We need to loop over the clusters using the original `clusters` list length
         while cluster_idx < k_new:
-            # Find the cities assigned to the current cluster
-            print(f"\nCluster {cluster_idx}:")
+            # Find the cities assigned to the current cluster  
+            medoid = clusters[cluster_idx]
+            
             
             cluster_cities = np.where(new_labels == clusters[cluster_idx])[0]
+            number_of_cities = len(cluster_cities)
+            print(f"\nCluster {cluster_idx}: with medoid: {clusters[cluster_idx]} with number of cities {number_of_cities}")
             
             # If the cluster is empty or has fewer cities than the minimum size
-            if len(cluster_cities) < min_cluster_size:
+            if number_of_cities < min_cluster_size:
                 medoid = clusters[cluster_idx]
                 print(f"Cluster {cluster_idx} with medoid: {medoid} is too small with number of cities {len(cluster_cities)} or empty, reassigning cities.")
                 
@@ -307,7 +312,7 @@ class k_clusters:
                     
                     # Find the closest medoid that is not the current one
                     for other_cluster_idx in range(k):
-                        if other_cluster_idx != cluster_idx:
+                        if other_cluster_idx != cluster_idx and clusters[other_cluster_idx] not in deleted_clusters:
                             distance_to_medoid = distance_matrix[city, clusters[other_cluster_idx]]
                             # Ensure that we don't consider infinite distances
                             if distance_to_medoid != np.inf and distance_to_medoid < min_distance:
@@ -317,8 +322,10 @@ class k_clusters:
                     # Reassign the city to the closest cluster
                     new_labels[city] = best_medoid
                     print(f"City {city} reassigned to medoid {best_medoid} with distance {min_distance}.")
+                print(f"Cluster {cluster_idx} with medoid: {medoid} has new length: {len(np.where(new_labels == medoid)[0])}")
+                deleted_clusters.append(medoid)
                 # Do not add the current cluster to the new_clusters list (remove it)
-                k_new -= 1
+                #k_new -= 1
 
             else:
                 # If the cluster is valid (not empty or too small), keep it
@@ -364,6 +371,14 @@ class k_clusters:
 
 
         '''
+  
+       
+        new_clusters = list(set(new_labels))
+    
+            
+
+     
+        
 
 
            
@@ -373,16 +388,18 @@ class k_clusters:
         print(f"\n New Number of Clusters: {k}")
         #print(f"New Cluster Assignments: {new_labels}")
         #print(f"New Clusters: {new_clusters}")
-        print(f"New Number of Cities: {len(new_labels)}")
+        unique_cities = len(set(new_labels))
+        print(f"New Number of Cities len labels: {len(new_labels)}")
+        print(f"New Number of Cities len labels: {unique_cities}")
         self.clusters_list.clear()
         for cluster in range(k):
             cluster_cities = np.where(new_labels == new_clusters[cluster])[0]
             intra_cluster_distance = 0
-            print(f"\nCluster {cluster}:")
-            print(f"  Medoid: {new_clusters[cluster]}")
-            print(f"  Number of Cities: {len(cluster_cities)}")
-            print(f"  Assigned Cities: {cluster_cities}")
-            print(f"  Intra-Cluster Distance: {intra_cluster_distance}")
+            #print(f"\nCluster {cluster}:")
+            #print(f"  Medoid: {new_clusters[cluster]}")
+            #print(f"  Number of Cities: {len(cluster_cities)}")
+            #print(f"  Assigned Cities: {cluster_cities}")
+            #print(f"  Intra-Cluster Distance: {intra_cluster_distance}")
             cluster_info = {"cluster": cluster, "medoid": clusters[cluster], "num_cities": len(cluster_cities), "assigned_cities": cluster_cities, "intra_cluster_distance": intra_cluster_distance}
             self.clusters_list.append(cluster_info)
 
@@ -401,7 +418,7 @@ class k_clusters:
         Returns:
         - intra_cluster_distances (dict): Dictionary with cluster index as the key and the total intra-cluster distance as the value.
         """
-        print("\nCalculating Intra-Cluster Distances:")
+        #print("\nCalculating Intra-Cluster Distances:")
 
         k = len(medoids)  # Number of clusters
         intra_cluster_distances = {}  # To store the intra-cluster distances
@@ -475,8 +492,21 @@ class k_clusters:
         unique_labels = np.unique(labels)
         
         if len(unique_labels) != k:
-            print(f"Error: The number of unique clusters is {len(unique_labels)}, but expected {k}.")
+            print(f"Error: The number of unique clusters is {len(unique_labels)}, but expected K: {k}.")
+            #print(f"Unique Labels: {unique_labels}")
+            #print(f"Expected Labels: {labels}")
+            #find teh lables in unique labels that are not in labels
+            for label in unique_labels:
+                if label not in labels:
+                    print(f"Cluster {label} is not assigned to any city.")
+
             return False
+        
+        #Check that each city is assigned to one unique cluster, if not print teh city number
+        for city in range(len(labels)):
+            if labels[city] not in unique_labels:
+                print(f"City {city} is assigned to an invalid cluster {labels[city]}.")
+                return False
         
         # If all checks pass
         print("All cities are assigned to exactly one cluster.")
@@ -494,18 +524,18 @@ class k_clusters:
         - medoids (numpy.ndarray): The medoids of the clusters.
         - k (int): The number of clusters.
         """
-        print("\nPlotting Intra-Cluster Distances:")
-        print(f"Number of Clusters: {k}")
-        print(f"Number of Cities: {len(labels)}")
-        print(f"Cluster Assignments: {labels}")
-        print(f"Medoids: {medoids}")
-        print(f"Inter-Cluster Distances: {inter_cluster_distance}")
+        #print("\nPlotting Intra-Cluster Distances:")
+        #print(f"Number of Clusters: {k}")
+        #print(f"Number of Cities: {len(labels)}")
+        #print(f"Cluster Assignments: {labels}")
+        #print(f"Medoids: {medoids}")
+        #print(f"Inter-Cluster Distances: {inter_cluster_distance}")
         cluster_cities = []
         for cluster in range(k):
             cluster_cities.append(len(np.where(labels == medoids[cluster])[0]))
        
         
-        fig, axes = plt.subplots(1, 2, figsize=(15, 6))  # 1 row, 2 columns
+        fig, axes = plt.subplots(1, 2, figsize=(20, 12))  # 1 row, 2 columns
 
         # Plot the intra-cluster distances
         axes[0].bar(range(k), inter_cluster_distance, color='skyblue')
@@ -520,6 +550,9 @@ class k_clusters:
         axes[1].set_ylabel('Number of Cities')
         axes[1].set_title('Number of Cities in Each Cluster')
         axes[1].set_xticks(range(k))
+        axes[1].set_xticklabels([f"C{cluster} (M{medoid})" for cluster, medoid in enumerate(medoids)], rotation=45, ha='right')
+        for i, val in enumerate(cluster_cities):
+            axes[1].text(i, val + 0.5, f"{val}", ha='center', va='bottom')
 
         # Show both plots
         plt.tight_layout()  # Adjusts layout for better spacing
