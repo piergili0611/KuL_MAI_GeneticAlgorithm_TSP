@@ -7,6 +7,7 @@ import seaborn as sns
 
 class cities:
     def __init__(self,num_cities):
+        np.random.seed(42)
         self.num_simulations_to_run = 2
         self.distanceMatrix = None
         self.num_cities = num_cities  
@@ -15,7 +16,7 @@ class cities:
         self.distance_matrix_cluster = []
         self.cities_cluster_list = []
         self.cities_sequence_list = []
-        np.random.seed(42)
+        
 
 
     def print_model(self):
@@ -60,6 +61,11 @@ class cities:
         #print(f"       - Clusters: {self.clusters_list}")
         #print(f"       - Cities [0]: {self.distanceMatrix.shape[0]}")
         #print(f"       - Cities [1]: {self.distanceMatrix.shape[1]}")
+        #print(f"       - Cities: {self.cities}")
+        #print(f"       - Distance Matrix: {self.distanceMatrix}")
+        #print(f"       - Number of cities: {self.num_cities}")
+        #print(f"       - Number of clusters: {len(self.clusters_list)}")
+        #print(f"       - Clusters: {self.clusters_list}")
 
         assigned_cities_list = [cluster['assigned_cities'] for cluster in self.clusters_list]
         

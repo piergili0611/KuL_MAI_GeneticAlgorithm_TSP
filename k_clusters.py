@@ -22,6 +22,7 @@ class k_clusters:
         print(f"       - Number of cities: {self.num_cities}")
         print(f"       - K: {k}")
         print(f"       - Min Cluster Size: {min_cluster_size}")
+        print(f"       - Distance Matrix: {self.distance_matrix}")
         print(f"   * Running model:")
 
         #print(f"Distance matrix: {self.distance_matrix}")
@@ -243,11 +244,11 @@ class k_clusters:
         for cluster in range(k):
             cluster_cities = np.where(labels == medoids[cluster])[0]
             intra_cluster_distance = intra_cluster_distances_dict.get(cluster, 0)
-            #print(f"\nCluster {cluster}:")
-            #print(f"  Medoid: {medoids[cluster]}")
-            #print(f"  Number of Cities: {len(cluster_cities)}")
-            #print(f"  Assigned Cities: {cluster_cities}")
-            #print(f"  Intra-Cluster Distance: {intra_cluster_distance}")
+            print(f"\nCluster {cluster}:")
+            print(f"  Medoid: {medoids[cluster]}")
+            print(f"  Number of Cities: {len(cluster_cities)}")
+            print(f"  Assigned Cities: {cluster_cities}")
+            print(f"  Intra-Cluster Distance: {intra_cluster_distance}")
             cluster_info = {"cluster": cluster, "medoid": medoids[cluster], "num_cities": len(cluster_cities), "assigned_cities": cluster_cities, "intra_cluster_distance": intra_cluster_distance}
             self.clusters_list.append(cluster_info)
             
@@ -524,6 +525,49 @@ class k_clusters:
         # Show both plots
         plt.tight_layout()  # Adjusts layout for better spacing
         plt.show()
+
+
+    def generate_distance_matrix_cluster(self,cluster_list):
+        '''
+        - Generate the distance matrix for the clusters
+        '''
+        print("\n---------- Generating Distance Matrix for Clusters: ------")
+        #print(f"   * Model Info:")
+        #print(f"       - Number of clusters: {len(self.clusters_list)}")
+        #print(f"       - Clusters: {self.clusters_list}")
+        #print(f"       - Cities [0]: {self.distanceMatrix.shape[0]}")
+        #print(f"       - Cities [1]: {self.distanceMatrix.shape[1]}")
+        #print(f"       - Cities: {self.cities}")
+        #print(f"       - Distance Matrix: {self.distanceMatrix}")
+        #print(f"       - Number of cities: {self.num_cities}")
+        #print(f"       - Number of clusters: {len(self.clusters_list)}")
+        #print(f"       - Clusters: {self.clusters_list}")
+
+        assigned_cities_list = [cluster['assigned_cities'] for cluster in cluster_list]
+        cities_cluster_list = []
+        distance_matrix_cluster = []
+        for cities in assigned_cities_list:
+            cities_cluster_list.append(cities)
+            num_cities = len(cities)
+            distanceMatrix = np.zeros((num_cities,num_cities))
+            #print(f"Number of cities: {num_cities}")
+            #print(f"Cities: {cities}")
+            row = 0
+            for i in cities:
+                
+                column = 0
+                for j in cities:
+                    dist = self.distance_matrix[i,j]
+                    #print(f"Distance between city {i} and city {j}: {dist}")
+                    distanceMatrix[row,column] = dist
+                    column += 1
+                row += 1
+            #print(f"Distance matrix: {distanceMatrix}")
+            distance_matrix_cluster.append(distanceMatrix)
+        
+     
+        return distance_matrix_cluster, cities_cluster_list
+
 
 
 

@@ -20,8 +20,8 @@ class r0818807:
 		file.close()
 		self.distanceMatrix = distanceMatrix
 
-	def load_algorithm(self):
-		self.algorithm = algorithm()
+	def load_algorithm(self,number_of_cities=None):
+		self.algorithm = algorithm(num_cities=number_of_cities)
 		
 
 	def run_k_means_algorithm(self, filename):
@@ -47,14 +47,24 @@ class r0818807:
 		# 2) ACreate cities and test the cluster
 		self.algorithm.test_k_cluster_model()
 
-	def run(self,filename,clusters=True):
-		self.load_distance_matrix(filename)
+	def run(self,filename,generateDataSets = True,clusters=True):
+		'''
+		- Run the algorithm
+		'''
+		if generateDataSets:
+			number_of_cities = int(filename.split(".")[0].split("tour")[1])
 
-		# 1) Create algorithm object and set distance matrix
-		self.load_algorithm()
-		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
-		
-		self.algorithm.run_algorithm(clusters=clusters)
+			self.load_algorithm(number_of_cities=number_of_cities)
+			self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets)
+
+		else:
+			
+			self.load_distance_matrix(filename)
+
+			self.load_algorithm()
+			self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+			
+			self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets)
 		
 
 	
