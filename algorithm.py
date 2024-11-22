@@ -1,6 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 import time 
+import math
 from Evol_algorithm_K import GA_K
 from Evol_algorithm_L2 import GA_K_L2
 from k_clusters import k_clusters
@@ -70,10 +71,11 @@ class algorithm:
         if model:
             num_cities = int(model.num_cities)
             if num_clusters is None:
-                num_clusters = int(num_cities/20)
+                num_clusters = math.ceil(num_cities/30)
             if min_cluster_size is None:
                 min_cluster_size = int(num_cities/60)
-            model.run_model( k=num_clusters, min_cluster_size=min_cluster_size) 
+            #model.run_model( k=num_clusters, min_cluster_size=min_cluster_size) 
+            model.run_model_KMedoids(num_clusters=num_clusters)
             cluster_list = model.clusters_list
         else:
             print(f"Please add the K_cluster model")
@@ -81,13 +83,18 @@ class algorithm:
 
         return cluster_list
     
+  
+    
     def add_run_k_cluster_model(self,num_clusters=None):
         '''
         - Add and run the K_cluster model
         '''
         self.add_K_clusters_model()
         self.cluster_list = self.run_k_cluster_model(model=self.K_clusters_model,num_clusters=num_clusters)
+        for cluster in self.cluster_list:
+            print(f"Cluster: {cluster}")
         self.assigned_cities_list = [cluster['assigned_cities'] for cluster in self.cluster_list]
+        print(f"Assigned cities list: {self.assigned_cities_list}")
 
     def K_cluster_model_generate_distance_matrix_cluster(self):
         '''
@@ -100,7 +107,7 @@ class algorithm:
     #--------------------------------------------------------------------- 3) GA_Level1 ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.008):
+    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.01):
         '''
         - Add the GA model
         '''
@@ -231,56 +238,7 @@ class algorithm:
     #--------------------------------------------------------------------- 6) Run Algorithm ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     
-    def run_algorithm_old(self,generateDataSets = True,clusters=True):
-        '''
-        - Run the algorithm
-        '''
-        distance_matrix_global = self.test_k_cluster_model(clusters=clusters)
-        
-        print(f"-- Running the algorithm --")
-        assigned_cities_list = [cluster['assigned_cities'] for cluster in self.cluster_list]
-        counter = 0
-        #print(f"Assigned cities list: {assigned_cities_list}")
-        #print(f"Cities cluster list self: {self.cities_cluster_list}")
-        #print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}")
-        for cities in self.cities_cluster_list:
-            #print(f"Cities: {cities}")
-            #print(f"Len Distance matrix cluster list: {len(self.distance_matrix_cluster_list)}")
-
-            # 1) Add the GA model and run it for each cluster of cities and measure the time taken
-            time_start_GA_level1 = time.time()
-            distance_matrix = self.distance_matrix_cluster_list[counter]
-            self.add_GA_level1_model(cities=cities,distance_matrix=distance_matrix)
-            self.run_GA_level1_model(cities)
-            best_solution = self.GA_level1_model.best_solution_cities
-            self.add_cluster_solution(best_solution)
-
-            time_end_GA_level1 = time.time()
-            delta_time = time_end_GA_level1-time_start_GA_level1    
-            print(f"Time taken for GA level 1: {delta_time}")
-            self.deltatime_cluster_list.append(delta_time)
-
-            # 2) Add the cities sequence to the cities model and plot the clusters
-            #self.cities_model.add_cities_sequence(self.GA_level1_model.best_solution_cities)
-            #self.cities_model.plot_clusters_sequence(city_sequence=True)
-            counter += 1
-
-        self.plot_ExecutionTime_Clusters()
-
-
-        # 2) Create and run Higher level GA model
-        self.add_GA_level2_model(distance_matrix=distance_matrix_global,cluster_solutions_matrix=self.clusters_solution_list)
-        time_start_GA_level1 = time.time()
-        self.GA_level2_model.run_model()
-        time_end_GA_level1 = time.time()
-        delta_time = time_end_GA_level1-time_start_GA_level1
-        print(f"Time taken for GA level 2: {delta_time}")
-        final_solution = self.GA_level2_model.best_solution_merged
-
-        # 2) Plot teh resulting sequence
-        self.cities_model.add_cities_sequence(final_solution)
-        self.cities_model.plot_clusters_sequence(city_sequence=True)
-        self.check_city_solution(final_solution)
+    
 
     def run_algorithm_main(self,generateDataSets = True,clusters=True):
         '''
@@ -291,6 +249,7 @@ class algorithm:
         else:
             self.run_algorithm_noGenerateDataSets(clusters=clusters)
 
+
     def run_algorithm_yesGenData(self,clusters=True):
         '''
         - Run the algorithm
@@ -298,13 +257,15 @@ class algorithm:
         index = 0
         final_fitness = 0
         final_solution = None
+        print(f"Number of clusters: {len(self.cities_cluster_list)}")
+        print(self.cities_cluster_list)
 
         for cities in self.cities_cluster_list:
             # 1) Add the GA model and run it for each cluster of cities and measure the time taken
             time_start_GA_level1 = time.time()
 
             distance_matrix = self.distance_matrix_cluster_list[index]
-            self.add_run_GA_level1_model(cities=cities,distance_matrix=distance_matrix)
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix)
             best_solution = self.GA_level1_model_retrieveBestSolution()
             self.add_cluster_solution(best_solution)
 
@@ -320,13 +281,17 @@ class algorithm:
         self.plot_ExecutionTime_Clusters()
 
         # 2) Create and run Higher level GA model
-        time_start_GA_level2 = time.time()
-        self.add_run_GA_level2_model(distance_matrix=self.distance_matrix,cluster_solutions_matrix=self.clusters_solution_list)
-        final_solution, final_fitness = self.GA_level2_model_retrieveBestSolution(fitness=True)
-        time_end_GA_level2 = time.time()
-        delta_time = time_end_GA_level2-time_start_GA_level2
-        print(f"Time taken for GA level 2: {delta_time}")
-        print(f"Final solution: {final_solution} & Final fitness: {final_fitness}")
+        if clusters:
+            
+            time_start_GA_level2 = time.time()
+            self.add_run_GA_level2_model(distance_matrix=self.distance_matrix,cluster_solutions_matrix=self.clusters_solution_list)
+            final_solution, final_fitness = self.GA_level2_model_retrieveBestSolution(fitness=True)
+            time_end_GA_level2 = time.time()
+            delta_time = time_end_GA_level2-time_start_GA_level2
+            print(f"Time taken for GA level 2: {delta_time}")
+        else:
+            final_solution = best_solution  
+        print(f"Final solution: {final_solution} ")
         self.check_city_solution(final_solution)
 
         # 2) Plot teh resulting sequence
@@ -346,7 +311,7 @@ class algorithm:
             time_start_GA_level1 = time.time()
 
             distance_matrix = self.distance_matrix_cluster_list[index]
-            self.add_run_GA_level1_model(cities=cities,distance_matrix=distance_matrix)
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix)
             best_solution = self.GA_level1_model_retrieveBestSolution()
             self.add_cluster_solution(best_solution)
 

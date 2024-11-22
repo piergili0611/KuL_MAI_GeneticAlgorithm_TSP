@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import seaborn as sns
-
+from sklearn_extra.cluster import KMedoids
 
 
 class k_clusters:
@@ -11,6 +11,103 @@ class k_clusters:
         self.distance_matrix = distance_matrix
         self.num_cities = distance_matrix.shape[0]
         self.clusters_list = []
+
+    def run_model_KMedoids(self,num_clusters,min_cluster_size=10):
+        '''
+        - Run the KMedoids clustering
+        '''
+        print("\n---------- KMedoids Clustering: ------")
+        # Replace np.inf with a large number
+        self.distance_matrix[self.distance_matrix == np.inf] = 1e10
+        print(f"Distance matrix: {self.distance_matrix}")
+
+        # K-Medoids clustering using a precomputed distance matrix
+        self.kmedoids = KMedoids(n_clusters=num_clusters, metric="precomputed", random_state=0)
+        self.labels = self.kmedoids.fit_predict(self.distance_matrix)
+
+        print("Cluster assignments:", self.labels)
+        print("Cluster medoids:", self.kmedoids.medoid_indices_)
+        #print("Inertia:", self.kmedoids.inertia_)
+        self.post_process_clusters()
+    
+    def post_process_clusters(self):
+        '''
+        - Post process the clusters
+        '''
+        print("\n---------- Post Processing Clusters: ------")
+
+        # Ensure medoid indices and labels are available
+        medoids = self.kmedoids.medoid_indices_
+        labels = self.labels
+        distance_matrix = self.distance_matrix
+
+        # Initialize the dictionary to store cluster information
+        self.clusters_list = []
+         
+
+        for cluster in range(len(medoids)):
+            # Get the medoid for the current cluster
+            medoid = medoids[cluster]
+
+            # Find the cities assigned to the current cluster
+            cluster_cities = np.where(labels == cluster)[0]
+
+            # Calculate the intra-cluster distance (sum of distances from each point to the medoid)
+            intra_cluster_distance = np.sum([distance_matrix[medoid][city] for city in cluster_cities])
+
+            # Store cluster information in the dictionary
+            cluster_info_dict = {
+                "medoid": medoid,
+                "num_cities": len(cluster_cities),
+                "assigned_cities": cluster_cities.tolist(),
+                "intra_cluster_distance": intra_cluster_distance
+            }
+
+            self.clusters_list.append(cluster_info_dict)
+        self.plot_post_processed_clusters()
+
+    def plot_post_processed_clusters(self):
+        """
+        Plots the intra-cluster distances and the number of cities for each post-processed cluster.
+        The function uses the data stored in `self.clusters_list` after post-processing the clusters.
+        """
+        print("\nPlotting Post-Processed Clusters:")
+        print(f"Number of Clusters: {len(self.clusters_list)}")
+
+        # Initialize lists to store the intra-cluster distances and number of cities for plotting
+        intra_cluster_distances = []
+        cluster_cities = []
+
+        # Loop through the post-processed clusters to collect the needed data
+        for cluster_info in self.clusters_list:
+            # Extract intra-cluster distance and the number of cities for each cluster
+            intra_cluster_distances.append(cluster_info['intra_cluster_distance'])
+            cluster_cities.append(cluster_info['num_cities'])
+
+        # Plotting the data
+        fig, axes = plt.subplots(1, 2, figsize=(15, 6))  # 1 row, 2 columns
+
+        # Plot the intra-cluster distances
+        axes[0].bar(range(len(self.clusters_list)), intra_cluster_distances, color='skyblue')
+        axes[0].set_xlabel('Cluster Index')
+        axes[0].set_ylabel('Intra-Cluster Distance')
+        axes[0].set_title('Intra-Cluster Distances for Each Cluster')
+        axes[0].set_xticks(range(len(self.clusters_list)))
+
+        # Plot the number of cities in each cluster
+        axes[1].bar(range(len(self.clusters_list)), cluster_cities, color='lightgreen')
+        axes[1].set_xlabel('Cluster Index')
+        axes[1].set_ylabel('Number of Cities')
+        axes[1].set_title('Number of Cities in Each Cluster')
+        axes[1].set_xticks(range(len(self.clusters_list)))
+
+        # Show both plots
+        plt.tight_layout()  # Adjusts layout for better spacing
+        plt.show()
+            
+        
+
+
 
 
     def print_info_run_model(self,k,min_cluster_size):

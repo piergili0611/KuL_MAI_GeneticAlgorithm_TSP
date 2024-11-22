@@ -61,8 +61,10 @@ class GA_K:
         '''
         #print(f"\n Best solution is : {best_solution}")
         #print(f"\n Cities are : {self.cities}")
+       
         
         self.best_solution_cities = self.cities[best_solution]
+        #self.best_solution_cities = best_solution
 
         #print(f"\n Best solution cities are : {self.best_solution_cities}")
 
@@ -74,6 +76,7 @@ class GA_K:
         print(f"       - Population Size: {self.population_size}")
         print(f"       - Number of cities: {self.gen_size}")
         print(f"       - Cities: {self.cities}")
+        #print(f"       - Distance Matrix: {self.distance_matrix}")
         print(f"   * Model Parameters:")
         print(f"       - K: {self.k_tournament_k}")
         print(f"       - Mutation rate: {self.mutation_rate}")
@@ -467,8 +470,8 @@ class GA_K:
 
         self.population = np.array([np.random.permutation(self.gen_size) for _ in range(self.population_size)])
         self.fitness = self.calculate_fitness(self.population)
-        #print(f"\n Initial Population: {self.population}")
-        #print(f"\n Initial Fitness: {self.fitness}")
+        print(f"\n Initial Population: {self.population}")
+        print(f"\n Initial Fitness: {self.fitness}")
         self.print_model_info()
 
 
@@ -809,6 +812,7 @@ class GA_K:
         self.best_fitness_list.append(self.best_objective)  
         best_index = np.argmin(self.fitness)
         best_solution = self.population[best_index]
+        #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution --> {best_solution}")
         self.retieve_order_cities(best_solution)    
         #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution --> {best_solution}")
         return self.mean_objective,self.best_objective,best_solution
