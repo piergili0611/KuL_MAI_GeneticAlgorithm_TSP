@@ -6,7 +6,7 @@ import seaborn as sns
 
 class GA_K_L2:
 
-    def __init__(self,clusters_solutions_matrix,cities_model,seed=None ,mutation_prob = 0.001,elitism_percentage = 20):
+    def __init__(self,clusters_solutions_matrix,cities_model,seed=None ,mutation_prob = 0.00,elitism_percentage = 20):
         #model_key_parameters
         #self.cities = cities 
         self.k_tournament_k = 3
@@ -24,6 +24,7 @@ class GA_K_L2:
 
         self.num_clusters = len(clusters_solutions_matrix)
         self.possible_entryAndExit_points_list = []
+       
 
       
         self.cities_model = cities_model
@@ -47,12 +48,14 @@ class GA_K_L2:
             bestSolution = np.array([1,2,3,4,5])
             '''
             iterations += 1
-            #print(f"\n Iteration number {iterations}")
-            parents_cluster, parents_cities = self.selection_k_tournament(num_individuals=self.population_size)    
-            offspring_cluster= self.crossover_singlepoint_population(parents_cluster)
-            offspring_mutated_cluster,offspring_mutated_cities = self.mutation_singlepoint_population(offspring_cluster)
+            print(f"\n Iteration number {iterations}")
+            parents_all_list = self.selection_k_tournament(num_individuals=self.population_size)    
+            offspring_all_list = self.crossover_singlepoint_population(parents_all_list)
+            
+        
+            mutated_all_list = self.mutation_singlepoint_population(offspring_all_list)    
 
-            self.eliminate_population(population=self.population, offsprings_cluster = offspring_mutated_cluster, offsprings_cities = offspring_mutated_cities)
+            self.eliminate_population(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list)
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
             yourConvergenceTestsHere = False
@@ -62,6 +65,380 @@ class GA_K_L2:
         
         return 0
     
+
+
+    def set_initialization(self):
+        '''
+        - Initialize the population
+        '''
+    
+       
+        # 1) Initialize the population with random permutations of the number of clusters
+        self.population_cluster = np.array([np.random.permutation(self.num_clusters) for _ in range(self.population_size)])
+        
+        # 2) Generate possible entries and exit points for each cluster
+        self.generate_possible_entries_and_exit_points()
+        
+        # 3) Merge clusters based on the cluster sequence and entry/exit points
+        self.population_cities,self.population_startEnd = self.merge_clusters(self.population_cluster)
+        #print(f"\nInitial Population: {self.population_cities}")
+
+        # 4) Merge clusters using greedy approach
+        #self.population_merged = self.greedyMerge_populationClusters(self.population_cluster)
+        #print(f"\nMerged Population: {self.population_merged}")
+    
+        
+        # 5) Calculate fitness for the merged population
+        self.fitness = self.calculate_fitness(self.population_cities)
+        #print(f"\nInitial Fitness: {self.fitness}")
+    
+        self.population_all_list = [self.population_cluster,self.population_startEnd,self.population_cities]
+        #print(f"\n Initial Population All List: {self.population_all_list}")
+        
+        # 6) Print model info
+        self.print_model_info()
+
+
+    def selection_k_tournament(self, num_individuals, k=3):
+        print(f"\n ----------------- Selection K Tournament -----------------")
+     
+        population_cluster = self.population_all_list[0]
+        population_startEnd = self.population_all_list[1]
+        population_merged = self.population_all_list[2]
+
+        # Step 1: Randomly choose k individuals for each tournament
+        tournament_indices = np.random.choice(self.population_size, size=(num_individuals, k), replace=True)
+        #print(f"\n tournament indices: {tournament_indices}")
+
+        # Step 2: Get the fitness scores of the selected individuals
+        tournament_fitness = self.fitness[tournament_indices]
+        #print(f"\n Fitness of the tournament is : {tournament_fitness}")    
+        
+
+        # Step 3: Get the index of the individual with the best fitness in each tournament
+        best_indices_in_tournament = np.argmin(tournament_fitness, axis=1)
+
+        # Step 4: Use these indices to select the best individuals from each tournament
+        best_selected_indices = tournament_indices[np.arange(num_individuals), best_indices_in_tournament]
+
+        # Step 5: Return the selected individualsi
+        # print this self.population[best_selected_indices],self.population_merged[best_selected_indices]
+        #print(f"\n K_Tournament indices: {self.population[best_selected_indices]} and {self.population_merged[best_selected_indices]}")  
+        selected_all_list = []
+        selected_all_list = [population_cluster[best_selected_indices],population_startEnd[best_selected_indices],population_merged[best_selected_indices]] 
+
+        return selected_all_list
+    
+    
+    #make me a function that will select the best individuals from the population based on the k_tournament, given talso the fitness of that population
+    def selection_k_tournament_population(self,num_individuals,population,fitness,k):
+        '''
+        - Select the best individuals from the population based on the k_tournament
+        '''
+        # Step 1: Randomly choose k individuals for each tournament
+        tournament_indices = np.random.choice(population.shape[0], size=(num_individuals, k), replace=True)
+        #print(f"\n tournament indices: {tournament_indices}")
+
+        # Step 2: Get the fitness scores of the selected individuals
+        tournament_fitness = fitness[tournament_indices]
+        #print(f"\n Fitness of the tournament is : {tournament_fitness}")    
+        
+
+        # Step 3: Get the index of the individual with the best fitness in each tournament
+        best_indices_in_tournament = np.argmin(tournament_fitness, axis=1)
+
+        # Step 4: Use these indices to select the best individuals from each tournament
+        best_selected_indices = tournament_indices[np.arange(num_individuals), best_indices_in_tournament]
+
+        #step 5 retrieve also teh fitness of the best individuals
+        best_selected_fitness = fitness[best_selected_indices]
+
+        # Step 5: Return the selected individuals and its fitness
+        return population[best_selected_indices],best_selected_fitness
+    
+        
+        
+
+
+    
+    
+    def crossover_singlepoint_population(self, selected_all_list):
+        # Number of parents in the population
+        print(f"\n ----------------- Crossover Single Point Population -----------------")
+        population_cluster = selected_all_list[0]
+        population_startEnd = selected_all_list[1]
+        population_cities = selected_all_list[2]
+
+        num_parents = population_cluster.shape[0]
+        #print(f"\n population_cluster: Parent population_cluster is : {population_cluster[1]}" )
+        
+        # Initialize the children population_cluster
+        children_population = np.zeros_like(population_cluster)
+        children_population_startEnd = np.zeros_like(population_startEnd)
+        
+        # Generate random crossover points
+        crossover_index = np.random.randint(1, self.gen_size)
+        
+        # Perform crossover for each pair of parents
+        for i in range(num_parents):
+            # Get the indices of the parents
+            parent1 = population_cluster[i]
+            parent2 = population_cluster[(i + 1) % num_parents]
+
+            parent1_startEnd = population_startEnd[i]
+            parent2_startEnd = population_startEnd[(i + 1) % num_parents]
+
+            crossover_index = np.random.randint(0, len(parent1))
+            
+            # Perform crossover
+            child1, child2, child1_startEnd, child2_startEnd = self.crossover_singlepoint(crossover_index,parent1, parent2,parent1_startEnd,parent2_startEnd)
+            
+            # Add the children to the population_cluster
+            children_population[i] = child1
+            children_population[(i + 1) % num_parents] = child2
+
+            children_population_startEnd[i] = child1_startEnd
+            children_population_startEnd[(i + 1) % num_parents] = child2_startEnd
+
+    
+   
+        children_population_cities = self.merge_paths_givenStartEnd(children_population,children_population_startEnd)
+    
+        offspring_all_list = [children_population,children_population_startEnd,children_population_cities]
+        return offspring_all_list   
+    
+
+    def crossover_singlepoint(self, crossover_index,parent1, parent2,parent1_startEnd,parent2_startEnd):
+        """
+        Perform Order Crossover (OX) for valid TSP offspring.
+
+        Parameters:
+        - parent1: numpy array, representing a parent tour (e.g., [0, 1, 2, 3, ...])
+        - parent2: numpy array, representing a parent tour (e.g., [3, 2, 1, 0, ...])
+
+        Returns:
+        - child1, child2: Two offspring with no duplicate cities and valid tours.
+        """
+        #print(f"\n ----------------- Crossover Single Point -----------------")
+        #print(f"\n Parent1: {parent1}")
+        #print(f"\n Parent2: {parent2}")
+        #print(f"\n Parent1 StartEnd: {parent1_startEnd}")
+        #print(f"\n Parent2 StartEnd: {parent2_startEnd}")
+        #print(f"\n Crossover index: {crossover_index}")
+        
+        num_cities = len(parent1)
+        
+        
+        
+        
+        # Step 2: Initialize offspring as arrays of -1 (indicating unfilled positions)
+        child1 = -1 * np.ones(num_cities, dtype=int)
+        child2 = -1 * np.ones(num_cities, dtype=int)
+        child1_startEnd = -1 * np.ones_like(parent1_startEnd)
+        child2_startEnd = -1 * np.ones_like(parent2_startEnd)
+        
+        # Step 3: Copy the selected segment from parent1 to child1, and from parent2 to child2
+        child1[:crossover_index] = parent1[:crossover_index]
+        child2[crossover_index:] = parent2[crossover_index:]
+        child1_startEnd[:crossover_index] = parent1_startEnd[:crossover_index]
+        child2_startEnd[crossover_index:] = parent2_startEnd[crossover_index:]
+        #print(f"\n Child1: {child1}")
+        #print(f"\n Child2: {child2}")
+        #print(f"\n Child1 StartEnd: {child1_startEnd}")
+        #print(f"\n Child2 StartEnd: {child2_startEnd}")
+
+        # Step 4: Fill the remaining positions in child1 with cities from parent2, while avoiding duplicates
+            
+        child1_end,child1_end_startEnd = self.fill_child(child1, child1_startEnd, parent2, parent2_startEnd)
+        child2_end,child2_end_startEnd = self.fill_child(child2, child2_startEnd, parent1, parent1_startEnd)      
+   
+
+    
+        #print(f"\n Child1: {child1_end}")
+        #print(f"\n Child2: {child2_end}")
+        #print(f"\n Child1 StartEnd: {child1_end_startEnd}")
+        #print(f"\n Child2 StartEnd: {child2_end_startEnd}")
+
+     
+
+        return child1_end, child2_end, child1_end_startEnd, child2_end_startEnd
+
+    
+    #make me a function teh remianing cities (marked qwith -1) with the cities from the parent2 efficiently with numpy functions
+    def fill_child(self,child,child_startEnd, other_parent,other_parent_startEnd):
+
+        for idx, element1 in enumerate(child):
+            if element1 == -1:
+                for element2, start_end in zip(other_parent, other_parent_startEnd):
+                    if element2 not in child:
+                        child[idx] = element2
+                        child_startEnd[idx] = start_end
+                        break  # Stop once we find a valid element
+        return child,child_startEnd
+
+    
+    
+    def fill_child_startEnd(self,child, other_parent):
+        counter = 0
+        for element1 in child:
+            if np.array_equal(element1, np.array([-1, -1])):
+                for element2 in other_parent:
+                    if element2 not in child:
+                        child[counter] = element2
+            counter += 1
+        return child
+
+
+
+    def mutation_singlepoint_population(self, offspring_all_list):
+        print(f"\n ----------------- Mutation Single Point Population -----------------")
+        mutation_rate = self.mutation_rate
+        population_cluster = offspring_all_list[0]
+        population_startEnd = offspring_all_list[1]
+        population_cities = offspring_all_list[2]
+
+        print(f"\n Mutation rate is : {mutation_rate}")
+        #print(f"\n Population cluster is : {population_cluster}")
+        #print(f"\n Population cities is : {population_cities}")
+        #print(f"\n Population startEnd is : {population_startEnd}")
+
+        # Number of individuals in the population
+        num_individuals = population_cluster.shape[0]
+        
+        # Initialize the mutated population
+        mutated_population_cluster = np.copy(population_cluster)
+        mutated_population_cities = np.copy(population_cities)
+        mutated_population_startEnd = np.copy(population_startEnd)
+        
+        # Perform mutation for each individual
+        
+        for i in range(num_individuals):
+            if np.random.rand() < mutation_rate:
+                mutated_population_startEnd[i] = self.mutation_singlepoint(population_cluster[i],individual_startEnd=population_startEnd[i] ,mutation_rate=mutation_rate)
+      
+        merged_mutated_population = self.merge_paths_givenStartEnd(mutated_population_cluster,mutated_population_startEnd)
+
+        offspring_mutated_all_list = [mutated_population_cluster,mutated_population_startEnd,merged_mutated_population]
+        return offspring_mutated_all_list
+
+
+
+    def mutation_singlepoint(self, individual,individual_startEnd, mutation_rate=0.8):
+        print(f"\n ----------------- Mutation Single Point -----------------")
+        num_genes = len(individual)
+        
+        # Initialize the mutated individual
+        mutated_individual = np.copy(individual)
+        mutated_startEnd = np.copy(individual_startEnd)
+        mutated_individual_end = np.copy(individual)
+        
+
+        # Select how many genes to mutate
+        num_mutations = np.random.randint(1, num_genes)
+
+        # Select indices to mutate
+        mutation_indices = np.random.choice(num_genes, size=num_mutations, replace=False)
+
+        
+
+        
+        # Perform mutation for each gene
+        for idx, element1 in enumerate(individual):
+         
+            # Get a random index for the mutation
+            if idx in mutation_indices:
+                
+                mutation_index = idx
+                
+                possible_startEnd = self.possible_entry_and_exit_points_list[mutation_index]
+                mutation_index2 = np.random.randint(len(possible_startEnd))
+
+                mutated_startEnd[idx] = possible_startEnd[mutation_index2]
+
+                #mutated_individual[i], mutated_individual[mutation_index] = mutated_individual[mutation_index], mutated_individual[i]
+              
+   
+        #print(f"\n Mutated Individual is : {mutated_individual}")
+        return mutated_startEnd
+    
+   
+
+    def eliminate_population(self, population_all_list, mutated_all_list):
+        """
+        Selects the best individuals from the combined population and offspring
+        based on fitness.
+
+        Parameters:
+        - population: numpy array of shape (population_size, individual_size)
+        - offspring: numpy array of shape (offspring_size, individual_size)
+
+        Returns:
+        - new_population: numpy array of shape (self.population_size, individual_size)
+        """
+        print(f"\n ---------------- Eliminate Population ----------------")
+        # Combine the original population with the offspring
+        #print(f"\n Orginial --> {population}")
+        #print(f"\n Offspring--> {offspring}")
+        population_cluster = population_all_list[0]
+        population_startEnd = population_all_list[1]
+        population_cities = population_all_list[2]
+
+        mutated_population_cluster = mutated_all_list[0]
+        mutated_population_startEnd = mutated_all_list[1]
+        mutated_population_cities = mutated_all_list[2]
+
+        combined_population = np.vstack((population_cluster, mutated_population_cluster))
+        combined_population_startEnd = np.vstack((population_startEnd, mutated_population_startEnd))
+        combined_population_cities = np.vstack((population_cities, mutated_population_cities))
+
+        # Calculate fitness for the combined population
+        fitness_scores = self.calculate_fitness(mutated_population_cities)
+        combined_fitness = np.hstack((self.fitness, fitness_scores))
+        #print(f"\n Fitness V1--> {fitness_scores}")
+       
+
+        # Get the indices of the best individuals based on fitness
+        
+        best_indices = np.argsort(combined_fitness)[:self.population_size]
+        self.fitness = combined_fitness[best_indices]
+
+        # Select the best individuals
+        self.population_cluster = combined_population[best_indices]
+        self.population_startEnd = combined_population_startEnd[best_indices]
+        self.population_cities = combined_population_cities[best_indices]  
+        self.population_all_list = [self.population_cluster,self.population_startEnd,self.population_cities] 
+        self.fitness = combined_fitness[best_indices]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -103,11 +480,12 @@ class GA_K_L2:
         self.distance_matrix = self.check_inf(distance_matrix=distance_matrix,replace_value=100000)
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
-        #self.population_size = 1*self.gen_size
-        self.population_size = 5
+        self.population_size = 1*self.gen_size
+        
         self.k_tournament_k = int((3/100)*self.population_size)
         print(f"Distance matrix is {self.distance_matrix}")
         #print(f"Gen size is {self.gen_size}")
+        print(f"Population size is {self.population_size}")
 
 
 
@@ -215,7 +593,8 @@ class GA_K_L2:
     def generate_possible_entries_and_exit_points(self):
         """
         Generate all valid entry and exit points for each cluster efficiently using NumPy.
-        Ensures entry != exit for all pairs.
+        Ensures entry != exit for all pairs, and the exit city is adjacent to the entry city (both forward and backward).
+        For the last city in the list, the adjacency is cyclic.
         """
         self.possible_entry_and_exit_points_list = []
 
@@ -224,72 +603,215 @@ class GA_K_L2:
             cities_numpy = self.clusters_solution_matrix[cluster]
             num_cities = len(cities_numpy)
 
-            # Create a meshgrid of indices to form all (entry, exit) pairs
-            entry_indices, exit_indices = np.meshgrid(np.arange(num_cities), np.arange(num_cities))
+            # Create a list to store the valid (entry, exit) pairs
+            valid_pairs = []
 
-            # Filter out pairs where entry == exit
-            valid_pairs_mask = entry_indices != exit_indices
+            # Iterate over each city to generate the valid entry and exit points
+            for i in range(num_cities):
+                # Entry point is cities_numpy[i]
+                entry = cities_numpy[i]
 
-            # Extract the valid pairs
-            entry_points = cities_numpy[entry_indices[valid_pairs_mask]]
-            exit_points = cities_numpy[exit_indices[valid_pairs_mask]]
+                # Forward adjacency (exit to the next city, looping back for the last city)
+                if i == num_cities - 1:
+                    # Last city connects back to the first city
+                    exit_forward = cities_numpy[0]
+                else:
+                    # Adjacent city in the list (forward direction)
+                    exit_forward = cities_numpy[i + 1]
 
-            # Combine entry and exit points into pairs
-            pairs = np.column_stack((entry_points, exit_points))
+                # Backward adjacency (exit to the previous city, looping back for the first city)
+                if i == 0:
+                    # First city connects back to the last city
+                    exit_backward = cities_numpy[num_cities - 1]
+                else:
+                    # Adjacent city in the list (backward direction)
+                    exit_backward = cities_numpy[i - 1]
+
+                # Add both forward and backward pairs (entry, exit)
+                valid_pairs.append((entry, exit_forward))
+                valid_pairs.append((entry, exit_backward))
+
+            # Convert the list of valid pairs to a NumPy array for easier manipulation
+            valid_pairs_np = np.array(valid_pairs)
 
             # Append to the result list
-            self.possible_entry_and_exit_points_list.append(pairs)
-            print(f"\n Possible entry and exit points for cluster {cluster}:\n{pairs}")
-            print(f"\n Number of pairs: {len(pairs)}")
-            print(f"\n Number of cities: {num_cities}")
+            self.possible_entry_and_exit_points_list.append(valid_pairs)
 
-    def reconstruct_solution(self):
-        """
-        Reconstruct the city sequence for each individual in the population.
-        The reconstructed sequence will be based on the cluster order from `self.clusters_solution_matrix`
-        and the entry-exit points from `self.population`.
-        """
-        reconstructed_solutions = []
+            # Print for debugging
+            print(f"\nPossible entry and exit points for cluster {cluster}:")
+            print(f"\nNumber of pairs: {len(valid_pairs_np)}")
+            #print(f"\nNumber of cities: {num_cities}")
+        #print(f"\n Possible entry and exit points: {self.possible_entry_and_exit_points_list}")
 
-        # Iterate through each individual in the population
-       # Iterate through each individual in the population
-        for i, individual in enumerate(self.population[0]):  # individual is the cluster order for a given solution
-            # Get the cluster order and corresponding entry-exit pairs for this individual
-            cluster_order = individual  # Cluster order for this individual
-            entry_exit_pairs = self.population[1][i]  # Corresponding entry-exit pairs for this individual
+    def merge_clusters(self, population_cluster):
+        """
+        Reconstructs the solution for each individual in the population based on the cluster sequence
+        and using the start and end cities for each cluster.
+
+        Parameters:
+        - population_cluster (np.ndarray): Array containing the order of clusters for each individual
+
+        Returns:
+        - merged_population (np.ndarray): A list of full traveling paths for each individual
+        """
+        merged_population = []
+        start_end_population_list = []
+        start_end_list = []
+
+        for cluster_sequence in population_cluster:
+            start_end_list = []
+            full_solution = []  # List to store the complete solution for the individual
+            visited_cities = set()  # To track cities already visited
             
-            # Start with an empty list to store the reconstructed city sequence
-            city_sequence = []
+            # Reconstruct each cluster path in the given order
+            for cluster_idx in range(len(cluster_sequence)):
+                cluster_id = cluster_sequence[cluster_idx]
+                start_city, end_city = self.get_start_end_for_cluster(cluster_id)
+                start_end_list.append((start_city, end_city))
+                cluster_cities = self.clusters_solution_matrix[cluster_id]
 
-            # For each cluster in the individual
-            for cluster_index, entry_exit_pair in zip(cluster_order, entry_exit_pairs):
-                # Unpack the entry and exit points from the pair
-                entry, exit = entry_exit_pair
+                # Reconstruct the path for this cluster
+                cluster_solution = self.reconstruct_cluster_path(cluster_cities, start_city, end_city, visited_cities)
 
-                # Get the ordered city sequence for this cluster from the clusters_solution_matrix
-                cluster_cities = self.clusters_solution_matrix[cluster_index]
+                # Append this cluster's solution to the full solution
+                full_solution.extend(cluster_solution)
 
-                # Find the position of the entry point in the cluster's city sequence
-                entry_pos = np.where(cluster_cities == entry)[0][0]
+            merged_population.append(np.array(full_solution))
+            start_end_population_list.append(start_end_list)
+            #print(f"\nMerged population: {merged_population}")
+            #print(f"\nLength of merged population: {len(merged_population[-1])}")
+            #print(f"\nStart-End list: {start_end_population_list}")
 
-                # Find the position of the exit point in the cluster's city sequence
-                exit_pos = np.where(cluster_cities == exit)[0][0]
+        return np.array(merged_population), np.array(start_end_population_list) 
 
-                # Reconstruct the sequence for this cluster starting from the entry point
-                # and ending at the exit point (inclusive of both)
-                if entry_pos < exit_pos:
-                    # Normal case: entry comes before exit in the sequence
-                    city_sequence.extend(cluster_cities[entry_pos:exit_pos + 1])
-                else:
-                    # If the entry comes after the exit, we need to wrap around (assuming circular order)
-                    city_sequence.extend(np.concatenate([cluster_cities[entry_pos:], cluster_cities[:exit_pos + 1]]))
 
-            # Append the reconstructed city sequence for this individual
-            reconstructed_solutions.append(np.array(city_sequence))
+    def reconstruct_cluster_path(self, cluster_cities, start_city, end_city, visited_cities):
+        """
+        Reconstructs the path for a single cluster based on its cities and the start/end points.
+        Ensures cities are in the correct order and that no cities are duplicated.
+        
+        Parameters:
+        - cluster_cities (np.ndarray): The list of cities for the cluster
+        - start_city (int): The start city for the path
+        - end_city (int): The end city for the path
+        - visited_cities (set): A set of cities that have already been added to the solution
+        
+        Returns:
+        - cluster_path (np.ndarray): The reconstructed path of cities for this cluster
+        """
+        # Create a list to store the cluster's path
+        cluster_path = []
+        #print(f"\n Cluster cities: {cluster_cities}")
+        #print(f"\n Start city: {start_city}, End city: {end_city}")
+        
+        # We need to ensure the path starts from the start city and ends at the end city
+        # The cluster's path must go through all cities in the correct order
+        # First, find the index of the start city and rotate the cities list to start at start_city
+        start_idx = np.where(cluster_cities == start_city)[0][0]
+        cluster_cities = np.roll(cluster_cities, -start_idx)  # Rotate array to start from the start_city
+        #print(f"\n Rotated cluster cities: {cluster_cities}")
 
-        # Convert the list of city sequences into a numpy array and return
-        print(f"\n Reconstructed solutions: {reconstructed_solutions}")
-        return np.array(reconstructed_solutions)
+        # Now the cluster_cities array starts at start_city, but we need to create a valid path for the cluster
+        # Traverse the cluster cities and add them to the path in the correct order
+        for city in cluster_cities:
+            if city not in visited_cities and city != end_city:
+                cluster_path.append(city)
+                visited_cities.add(city)  # Mark the city as visited
+        
+        # Ensure the path ends at the end city if it isn't already the last city
+        if cluster_path[-1] != end_city:
+            cluster_path.append(end_city)
+            visited_cities.add(end_city)
+        
+        return np.array(cluster_path)
+
+
+
+    def get_start_end_for_cluster(self, cluster_id, element=None):
+        """
+        Retrieves the start and end cities for the given cluster.
+
+        Parameters:
+        - cluster_id (int): The identifier of the cluster
+        - element (int, optional): The index of the valid entry and exit pair to select. If None, a random pair is selected.
+
+        Returns:
+        - (start_city, end_city): A tuple containing the start and end cities for the cluster
+        """
+        # Fetch the possible entry and exit points for the cluster from the precomputed list
+        valid_pairs = self.possible_entry_and_exit_points_list[cluster_id]
+        
+        # If element is not provided (None), randomly select a valid pair
+        if element is None:
+            element = np.random.randint(0, len(valid_pairs))  # Randomly select an index
+        
+        #print(f"\n Valid pairs: {valid_pairs}")
+        #print(f"\n Element: {element}")
+        # Select the specific pair (start, end) based on the provided element index
+        start_city, end_city = valid_pairs[element]
+        #print(f"\n Start city: {start_city}, End city: {end_city}")
+        
+        return start_city, end_city
+    
+
+    def merge_paths_givenStartEnd(self, population_cluster,population_startEnd):
+        """
+        Reconstructs the solution for each individual in the population based on the cluster sequence
+        and using the start and end cities for each cluster.
+
+        Parameters:
+        - population_cluster (np.ndarray): Array containing the order of clusters for each individual
+
+        Returns:
+        - merged_population (np.ndarray): A list of full traveling paths for each individual
+        """
+        print(f"\n ----------------- Merge Paths Given Start and End -----------------")
+        #print(f"\n Population cluster: {population_cluster}")
+        #print(f"\n Population startEnd: {population_startEnd}")
+        merged_population = []
+        start_end_population_list = []
+        start_end_list = []
+        counter = 0
+
+        for cluster_sequence in population_cluster:
+            start_end_list = []
+            full_solution = []  # List to store the complete solution for the individual
+            visited_cities = set()  # To track cities already visited
+            cluster_startEnd = population_startEnd[counter]   
+            #print(f"\n Cluster sequence: {cluster_sequence}")
+            # Reconstruct each cluster path in the given order
+            for cluster_idx in range(len(cluster_sequence)):
+                #print(f"\n Cluster idx: {cluster_idx}")
+                cluster_id = cluster_sequence[cluster_idx]
+                start_city, end_city = cluster_startEnd[cluster_idx]
+                #print(f"\n Start city: {start_city}, End city: {end_city}")
+                start_end_list.append((start_city, end_city))
+                cluster_cities = self.clusters_solution_matrix[cluster_id]
+
+                # Reconstruct the path for this cluster
+                cluster_solution = self.reconstruct_cluster_path(cluster_cities, start_city, end_city, visited_cities)
+
+                # Append this cluster's solution to the full solution
+                full_solution.extend(cluster_solution)
+
+            merged_population.append(np.array(full_solution))
+            start_end_population_list.append(start_end_list)
+            #print(f"\nMerged population: {merged_population}")
+            #print(f"\nLength of merged population: {len(merged_population[-1])}")
+            #print(f"\nStart-End list: {start_end_population_list}")
+            counter += 1
+
+        #print(f"\nMerged population: {merged_population}")
+
+        return np.array(merged_population)
+
+
+
+    
+
+
+
+    
                 
 
 
@@ -309,255 +831,10 @@ class GA_K_L2:
         return distance_matrix
     
 
-    def set_initialization(self):
-        '''
-        - Initialize the population
-        '''
-       
-        # 1) Initialize the population with random permutations of the number of clusters
-        self.population= np.array([np.random.permutation(self.num_clusters) for _ in range(self.population_size)])
-        print(f"\n Initial Population: {self.population}")
-        sol_merged_list = []
-        self.population_merged = self.greedyMerge_populationClusters(self.population)
-        print(f"\n Merged Population: {self.population_merged}")
-       
-
-
-    
-        #self.population = np.array([np.random.permutation(self.gen_size) for _ in range(self.population_size)])
-        self.fitness = self.calculate_fitness(self.population_merged)
-        
-        print(f"\n Initial Fitness: {self.fitness}")
-        self.print_model_info()
-
-
-    def selection_k_tournament(self, num_individuals, k=3):
-       #print(f"\n Population size: {self.population_size}")
-        #print(f"\n K size: {k}")
-        #print(f"\n Number of individuals: {num_individuals}")
-        # Step 1: Randomly choose k individuals for each tournament
-        tournament_indices = np.random.choice(self.population_size, size=(num_individuals, k), replace=True)
-        #print(f"\n tournament indices: {tournament_indices}")
-
-        # Step 2: Get the fitness scores of the selected individuals
-        tournament_fitness = self.fitness[tournament_indices]
-        #print(f"\n Fitness of the tournament is : {tournament_fitness}")    
-        
-
-        # Step 3: Get the index of the individual with the best fitness in each tournament
-        best_indices_in_tournament = np.argmin(tournament_fitness, axis=1)
-
-        # Step 4: Use these indices to select the best individuals from each tournament
-        best_selected_indices = tournament_indices[np.arange(num_individuals), best_indices_in_tournament]
-
-        # Step 5: Return the selected individualsi
-        # print this self.population[best_selected_indices],self.population_merged[best_selected_indices]
-        #print(f"\n K_Tournament indices: {self.population[best_selected_indices]} and {self.population_merged[best_selected_indices]}")    
-
-        return self.population[best_selected_indices],self.population_merged[best_selected_indices]
-    
-    
-    #make me a function that will select the best individuals from the population based on the k_tournament, given talso the fitness of that population
-    def selection_k_tournament_population(self,num_individuals,population,fitness,k):
-        '''
-        - Select the best individuals from the population based on the k_tournament
-        '''
-        # Step 1: Randomly choose k individuals for each tournament
-        tournament_indices = np.random.choice(population.shape[0], size=(num_individuals, k), replace=True)
-        #print(f"\n tournament indices: {tournament_indices}")
-
-        # Step 2: Get the fitness scores of the selected individuals
-        tournament_fitness = fitness[tournament_indices]
-        #print(f"\n Fitness of the tournament is : {tournament_fitness}")    
-        
-
-        # Step 3: Get the index of the individual with the best fitness in each tournament
-        best_indices_in_tournament = np.argmin(tournament_fitness, axis=1)
-
-        # Step 4: Use these indices to select the best individuals from each tournament
-        best_selected_indices = tournament_indices[np.arange(num_individuals), best_indices_in_tournament]
-
-        #step 5 retrieve also teh fitness of the best individuals
-        best_selected_fitness = fitness[best_selected_indices]
-
-        # Step 5: Return the selected individuals and its fitness
-        return population[best_selected_indices],best_selected_fitness
-    
-        
-        
 
 
     
     
-    def crossover_singlepoint_population(self, population):
-        # Number of parents in the population
-        num_parents = population.shape[0]
-        #print(f"\n POPULATION: Parent Population is : {population[1]}" )
-        
-        # Initialize the children population
-        children_population = np.zeros_like(population)
-        
-        # Generate random crossover points
-        crossover_index = np.random.randint(1, self.gen_size)
-        
-        # Perform crossover for each pair of parents
-        for i in range(num_parents):
-            # Get the indices of the parents
-            parent1 = population[i]
-            parent2 = population[(i + 1) % num_parents]
-            
-            # Perform crossover
-            child1, child2 = self.crossover_singlepoint(parent1, parent2)
-            
-            # Add the children to the population
-            children_population[i] = child1
-            children_population[(i + 1) % num_parents] = child2
-
-        #print(f"\n CROSSOVER: Children Population is : {children_population[1]}" )
-
-    
-        
-        return children_population
-    
-
-    def crossover_singlepoint(self, parent1, parent2):
-        """
-        Perform Order Crossover (OX) for valid TSP offspring.
-
-        Parameters:
-        - parent1: numpy array, representing a parent tour (e.g., [0, 1, 2, 3, ...])
-        - parent2: numpy array, representing a parent tour (e.g., [3, 2, 1, 0, ...])
-
-        Returns:
-        - child1, child2: Two offspring with no duplicate cities and valid tours.
-        """
-        num_cities = len(parent1)
-        
-        # Step 1: Select two crossover points randomly
-        crossover_index1 = np.random.randint(0, num_cities)
-        crossover_index2 = np.random.randint(crossover_index1, num_cities)
-        
-        # Step 2: Initialize offspring as arrays of -1 (indicating unfilled positions)
-        child1 = -1 * np.ones(num_cities, dtype=int)
-        child2 = -1 * np.ones(num_cities, dtype=int)
-        
-        # Step 3: Copy the selected segment from parent1 to child1, and from parent2 to child2
-        child1[crossover_index1:crossover_index2] = parent1[crossover_index1:crossover_index2]
-        child2[crossover_index1:crossover_index2] = parent2[crossover_index1:crossover_index2]
-        
-        # Step 4a: Fill the remaining positions in child1 with cities from parent2, while avoiding duplicates
-        def fill_child(child, parent_segment, other_parent):
-            current_idx = (crossover_index2) % num_cities  # Start filling from the end of the copied segment
-            for city in other_parent:
-                if city not in child:  # Avoid duplicates
-                    child[current_idx] = city
-                    current_idx = (current_idx + 1) % num_cities  # Wrap around circularly
-
-        # Step 4b: PMX method
-        def pmx_fill_child(child, parent_segment, other_parent, start, end):
-            # Fill the remaining cities from the other parent using the PMX method
-            for i in range(start, end):
-                if parent_segment[i] not in child[start:end]:
-                    city_to_fill = parent_segment[i]
-                    place_index = i
-                    while child[place_index] != -1:
-                        city_to_fill = other_parent[place_index]
-                        place_index = np.where(parent_segment == city_to_fill)[0][0]
-                    child[place_index] = city_to_fill
-
-            for i in range(num_cities):
-                if child1[i] == -1:
-                    child1[i] = parent2[i]
-                if child2[i] == -1:
-                    child2[i] = parent1[i]
-                    
-        fill_child(child1, parent1[crossover_index1:crossover_index2], parent2)
-        fill_child(child2, parent2[crossover_index1:crossover_index2], parent1)
-
-        # pmx_fill_child(child1, parent1, parent2, crossover_index1, crossover_index2)
-        # pmx_fill_child(child2, parent2, parent1, crossover_index1, crossover_index2)
-
-        
-        return child1, child2
-
-
-
-
-    def mutation_singlepoint_population(self, population):
-        mutation_rate = self.mutation_rate
-
-        # Number of individuals in the population
-        num_individuals = population.shape[0]
-        
-        # Initialize the mutated population
-        mutated_population = np.copy(population)
-        
-        # Perform mutation for each individual
-        for i in range(num_individuals):
-            mutated_population[i] = self.mutation_singlepoint(population[i], mutation_rate)
-
-        #print(f"\n MUTATION: Children Population is : {mutated_population[1]}" )
-        merged_mutated_population = self.greedyMerge_populationClusters(mutated_population) 
-        
-        return mutated_population,merged_mutated_population
-
-    def mutation_singlepoint(self, individual, mutation_rate=0.8):
-        # Number of genes in the individual
-        num_genes = len(individual)
-        #print(f"\n Individual is : {individual}")
-        
-        # Initialize the mutated individual
-        mutated_individual = np.copy(individual)
-        
-        # Perform mutation for each gene
-        for i in range(num_genes):
-            # Check if we should perform mutation for this gene
-            if np.random.rand() < mutation_rate:
-                # Get a random index for the mutation
-                mutation_index = np.random.randint(num_genes)
-                
-                # Perform mutation
-                mutated_individual[i], mutated_individual[mutation_index] = mutated_individual[mutation_index], mutated_individual[i]
-        #print(f"\n Mutated Individual is : {mutated_individual}")
-        return mutated_individual
-    
-   
-
-    def eliminate_population(self, population, offsprings_cluster,offsprings_cities):
-        """
-        Selects the best individuals from the combined population and offspring
-        based on fitness.
-
-        Parameters:
-        - population: numpy array of shape (population_size, individual_size)
-        - offspring: numpy array of shape (offspring_size, individual_size)
-
-        Returns:
-        - new_population: numpy array of shape (self.population_size, individual_size)
-        """
-        # Combine the original population with the offspring
-        #print(f"\n Orginial --> {population}")
-        #print(f"\n Offspring--> {offspring}")
-        combined_population = np.vstack((population, offsprings_cluster))
-        combined_population_cities = np.vstack((self.population_merged, offsprings_cities))
-
-        # Calculate fitness for the combined population
-        fitness_scores = self.calculate_fitness(offsprings_cities)
-        combined_fitness = np.hstack((self.fitness, fitness_scores))
-        #print(f"\n Fitness V1--> {fitness_scores}")
-       
-
-        # Get the indices of the best individuals based on fitness
-        
-        best_indices = np.argsort(combined_fitness)[:self.population_size]
-        self.fitness = combined_fitness[best_indices]
-
-        # Select the best individuals
-        self.population = combined_population[best_indices]
-        self.population_merged = combined_population_cities[best_indices]
-        self.fitness = combined_fitness[best_indices]
-
-    #make me a elimnate population that will use my elitism percentage to keep the best individuals and the rest will be compute dvia a k_tournament fucntion 
 
     def eliminate_population_elitism(self,population,offsprings):
         '''
@@ -674,10 +951,10 @@ class GA_K_L2:
         self.mean_fitness_list.append(self.mean_objective)
         self.best_fitness_list.append(self.best_objective)  
         best_index = np.argmin(self.fitness)
-        best_solution = self.population[best_index]
-        self.best_solution_merged = self.population_merged[best_index]
+        best_solution = self.population_cluster[best_index]
+        self.best_solution_cities = self.population_cities[best_index]
         #self.retieve_order_cities(best_solution_merged)    
-        #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution --> {best_solution}")
+        #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution Clusters --> {best_solution} \n Best Solution Cities --> {self.best_solution_cities}")
         return self.mean_objective,self.best_objective,best_solution
     
     def print_best_solution(self):
@@ -685,7 +962,7 @@ class GA_K_L2:
         - Print the best solution
         '''
         
-        print(f"\n Best solution is : {self.best_objective} \n Best solution cities are : {self.best_solution_merged}")
+        print(f"\n Best solution is : {self.best_objective} \n Best solution cities are : {self.best_solution_cities}")
     
     
 

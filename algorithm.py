@@ -138,7 +138,7 @@ class algorithm:
     #--------------------------------------------------------------------- 4) GA_Level2 ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def add_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,mutation_prob=0.1):
+    def add_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,mutation_prob=1):
         '''
         - Add the GA model
         '''
@@ -163,7 +163,7 @@ class algorithm:
         '''
         - Retrieve the best solution
         '''
-        return self.GA_level2_model.best_solution_merged, self.GA_level2_model.best_objective
+        return self.GA_level2_model.best_solution_cities, self.GA_level2_model.best_objective
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 5) City Model ------------------------------------------------------------------------------------------------
