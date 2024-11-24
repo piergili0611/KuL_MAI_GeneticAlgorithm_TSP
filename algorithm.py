@@ -107,11 +107,11 @@ class algorithm:
     #--------------------------------------------------------------------- 3) GA_Level1 ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.8,local_search=True):
+    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.1,local_search=True):
         '''
         - Add the GA model
         '''
-        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42,local_search=local_search)
+        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42)
         model.set_distance_matrix(distance_matrix)
         self.GA_level1_model = model
 

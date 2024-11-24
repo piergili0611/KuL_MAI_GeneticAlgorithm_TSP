@@ -509,9 +509,9 @@ class GA_K_L2:
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
         if self.gen_size > 300:
-            self.population_size = 100
+            self.population_size = 200
         else:
-            self.population_size = int(self.gen_size/10)
+            self.population_size = 200
         
         
         self.k_tournament_k = int((3/100)*self.population_size)
@@ -1179,7 +1179,11 @@ class GA_K_L2:
             xaxis_title='Iterations',
             yaxis_title='Distance',
             legend=dict(x=0, y=1),
-            hovermode='x'
+            hovermode='x',
+            yaxis=dict(
+            type='log',  # Set Y-axis to logarithmic scale
+            autorange=True  # Ensure the axis is adjusted automatically
+            )
         )
 
         # Show the plot
