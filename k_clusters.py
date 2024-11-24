@@ -18,11 +18,11 @@ class k_clusters:
         '''
         print("\n---------- KMedoids Clustering: ------")
         # Replace np.inf with a large number
-        self.distance_matrix[self.distance_matrix == np.inf] = 1e10
+        self.distance_matrix[self.distance_matrix == np.inf] = 1e8
         print(f"Distance matrix: {self.distance_matrix}")
 
         # K-Medoids clustering using a precomputed distance matrix
-        self.kmedoids = KMedoids(n_clusters=num_clusters, metric="precomputed", random_state=0)
+        self.kmedoids = KMedoids(n_clusters=num_clusters, metric="precomputed",max_iter=10000, random_state=0)
         self.labels = self.kmedoids.fit_predict(self.distance_matrix)
 
         print("Cluster assignments:", self.labels)

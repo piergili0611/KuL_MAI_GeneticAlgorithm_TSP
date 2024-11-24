@@ -71,7 +71,7 @@ class algorithm:
         if model:
             num_cities = int(model.num_cities)
             if num_clusters is None:
-                num_clusters = math.ceil(num_cities/30)
+                num_clusters = math.ceil(num_cities/20)
             if min_cluster_size is None:
                 min_cluster_size = int(num_cities/60)
             #model.run_model( k=num_clusters, min_cluster_size=min_cluster_size) 
@@ -107,11 +107,11 @@ class algorithm:
     #--------------------------------------------------------------------- 3) GA_Level1 ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.01):
+    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.8,local_search=True):
         '''
         - Add the GA model
         '''
-        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42)
+        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42,local_search=local_search)
         model.set_distance_matrix(distance_matrix)
         self.GA_level1_model = model
 
@@ -121,11 +121,12 @@ class algorithm:
         '''
         self.GA_level1_model.run_model()
 
-    def add_run_GA_level1_model(self,distance_matrix,cities):
+    def add_run_GA_level1_model(self,distance_matrix,cities,local_search=True):
         '''
         - Add and run the GA model
         '''
-        self.add_GA_level1_model(distance_matrix=distance_matrix,cities=cities)
+        
+        self.add_GA_level1_model(distance_matrix=distance_matrix,cities=cities,local_search=local_search)
         self.run_GA_level1_model(cities)
 
     def GA_level1_model_retrieveBestSolution(self):
@@ -138,7 +139,7 @@ class algorithm:
     #--------------------------------------------------------------------- 4) GA_Level2 ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def add_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,mutation_prob=1):
+    def add_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,mutation_prob=0.8):
         '''
         - Add the GA model
         '''
@@ -240,17 +241,17 @@ class algorithm:
     
     
 
-    def run_algorithm_main(self,generateDataSets = True,clusters=True):
+    def run_algorithm_main(self,generateDataSets = True,clusters=True,local_search=True):
         '''
         - Run the algorithm
         '''
         if generateDataSets:
-            self.run_algorithm_yesGenerateDataSets(clusters=clusters)
+            self.run_algorithm_yesGenerateDataSets(clusters=clusters,local_search=local_search)
         else:
-            self.run_algorithm_noGenerateDataSets(clusters=clusters)
+            self.run_algorithm_noGenerateDataSets(clusters=clusters,local_search=local_search)
 
 
-    def run_algorithm_yesGenData(self,clusters=True):
+    def run_algorithm_yesGenData(self,clusters=True,local_search=True):
         '''
         - Run the algorithm
         '''
@@ -265,7 +266,7 @@ class algorithm:
             time_start_GA_level1 = time.time()
 
             distance_matrix = self.distance_matrix_cluster_list[index]
-            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix)
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search)
             best_solution = self.GA_level1_model_retrieveBestSolution()
             self.add_cluster_solution(best_solution)
 
@@ -298,7 +299,7 @@ class algorithm:
         self.cities_model_addAndPlotClustersSequence(final_solution)
 
 
-    def run_algorithm_noGenData(self,clusters=True):
+    def run_algorithm_noGenData(self,clusters=True,local_search=True):
         '''
         - Run the algorithm
         '''
@@ -311,7 +312,7 @@ class algorithm:
             time_start_GA_level1 = time.time()
 
             distance_matrix = self.distance_matrix_cluster_list[index]
-            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix)
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search)
             best_solution = self.GA_level1_model_retrieveBestSolution()
             self.add_cluster_solution(best_solution)
 
@@ -327,14 +328,19 @@ class algorithm:
         self.plot_ExecutionTime_Clusters()
 
         # 2) Create and run Higher level GA model
-        time_start_GA_level2 = time.time()
-        self.add_run_GA_level2_model(distance_matrix=self.distance_matrix,cluster_solutions_matrix=self.clusters_solution_list)
-        final_solution, final_fitness = self.GA_level2_model_retrieveBestSolution(fitness=True)
-        time_end_GA_level2 = time.time()
-        delta_time = time_end_GA_level2-time_start_GA_level2
-        print(f"Time taken for GA level 2: {delta_time}")
-        print(f"Final solution: {final_solution} & Final fitness: {final_fitness}")
-        self.check_city_solution(final_solution)
+        if clusters:
+            time_start_GA_level2 = time.time()
+            self.add_run_GA_level2_model(distance_matrix=self.distance_matrix,cluster_solutions_matrix=self.clusters_solution_list)
+            final_solution, final_fitness = self.GA_level2_model_retrieveBestSolution(fitness=True)
+            time_end_GA_level2 = time.time()
+            delta_time = time_end_GA_level2-time_start_GA_level2
+            print(f"Time taken for GA level 2: {delta_time}")
+            print(f"Final solution: {final_solution} & Final fitness: {final_fitness}")
+            self.check_city_solution(final_solution)
+        else:
+            final_solution = best_solution  
+            print(f"Final solution: {final_solution} ")
+            self.check_city_solution(final_solution)
 
         # 2) Plot teh resulting sequence
         #self.cities_model_addAndPlotClustersSequence(final_solution)
@@ -345,7 +351,7 @@ class algorithm:
 
         
 
-    def run_algorithm_yesGenerateDataSets(self,clusters=True):
+    def run_algorithm_yesGenerateDataSets(self,clusters=True,local_search=True):
         '''
         - Run the algorithm with generating data sets
         '''
@@ -361,14 +367,14 @@ class algorithm:
         self.cities_model_generateDistanceMatrix()
 
         print(f"-- Running the algorithm: generatedDatsSets --")
-        self.run_algorithm_yesGenData(clusters=clusters)
+        self.run_algorithm_yesGenData(clusters=clusters,local_search=local_search)
 
 
 
         
 
 
-    def run_algorithm_noGenerateDataSets(self,clusters=True):
+    def run_algorithm_noGenerateDataSets(self,clusters=True,local_search=True):
         '''
         - Run the algorithm without generating data sets, --> KU Leuven DataSets
         '''
@@ -384,7 +390,7 @@ class algorithm:
         self.K_cluster_model_generate_distance_matrix_cluster()
 
         print(f"-- Running the algorithm: generatedDatsSets --")
-        self.run_algorithm_noGenData(clusters=clusters)
+        self.run_algorithm_noGenData(clusters=clusters,local_search=local_search)
 
 
 

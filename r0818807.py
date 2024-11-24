@@ -47,7 +47,7 @@ class r0818807:
 		# 2) ACreate cities and test the cluster
 		self.algorithm.test_k_cluster_model()
 
-	def run(self,filename,generateDataSets = True,clusters=True):
+	def run(self,filename,generateDataSets = True,clusters=True,local_search=True):
 		'''
 		- Run the algorithm
 		'''
@@ -55,7 +55,7 @@ class r0818807:
 			number_of_cities = int(filename.split(".")[0].split("tour")[1])
 
 			self.load_algorithm(number_of_cities=number_of_cities)
-			self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets)
+			self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets,local_search=local_search)
 
 		else:
 			
@@ -64,7 +64,7 @@ class r0818807:
 			self.load_algorithm()
 			self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
 			
-			self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets)
+			self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets,local_search=local_search)
 		
 
 	

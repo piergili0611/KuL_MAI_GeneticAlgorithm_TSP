@@ -48,7 +48,7 @@ class GA_K_L2:
             bestSolution = np.array([1,2,3,4,5])
             '''
             iterations += 1
-            print(f"\n Iteration number {iterations}")
+            #print(f"\n Iteration number {iterations}")
             parents_all_list = self.selection_k_tournament(num_individuals=self.population_size)    
             offspring_all_list = self.crossover_singlepoint_population(parents_all_list)
             
@@ -100,7 +100,7 @@ class GA_K_L2:
 
 
     def selection_k_tournament(self, num_individuals, k=3):
-        print(f"\n ----------------- Selection K Tournament -----------------")
+        #print(f"\n ----------------- Selection K Tournament -----------------")
      
         population_cluster = self.population_all_list[0]
         population_startEnd = self.population_all_list[1]
@@ -164,7 +164,7 @@ class GA_K_L2:
     
     def crossover_singlepoint_population(self, selected_all_list):
         # Number of parents in the population
-        print(f"\n ----------------- Crossover Single Point Population -----------------")
+        #print(f"\n ----------------- Crossover Single Point Population -----------------")
         population_cluster = selected_all_list[0]
         population_startEnd = selected_all_list[1]
         population_cities = selected_all_list[2]
@@ -291,13 +291,13 @@ class GA_K_L2:
 
 
     def mutation_singlepoint_population(self, offspring_all_list):
-        print(f"\n ----------------- Mutation Single Point Population -----------------")
+        #print(f"\n ----------------- Mutation Single Point Population -----------------")
         mutation_rate = self.mutation_rate
         population_cluster = offspring_all_list[0]
         population_startEnd = offspring_all_list[1]
         population_cities = offspring_all_list[2]
 
-        print(f"\n Mutation rate is : {mutation_rate}")
+        #print(f"\n Mutation rate is : {mutation_rate}")
         #print(f"\n Population cluster is : {population_cluster}")
         #print(f"\n Population cities is : {population_cities}")
         #print(f"\n Population startEnd is : {population_startEnd}")
@@ -324,13 +324,16 @@ class GA_K_L2:
 
 
     def mutation_singlepoint(self, individual,individual_startEnd, mutation_rate=0.8):
-        print(f"\n ----------------- Mutation Single Point -----------------")
+        #print(f"\n ----------------- Mutation Single Point -----------------")
+        
+     
         num_genes = len(individual)
+        
         
         # Initialize the mutated individual
         mutated_individual = np.copy(individual)
         mutated_startEnd = np.copy(individual_startEnd)
-        mutated_individual_end = np.copy(individual)
+        
         
 
         # Select how many genes to mutate
@@ -338,28 +341,53 @@ class GA_K_L2:
 
         # Select indices to mutate
         mutation_indices = np.random.choice(num_genes, size=num_mutations, replace=False)
+        #print(f"\n Mutation indices are : {mutation_indices} from {num_genes}")
 
         
 
         
         # Perform mutation for each gene
-        for idx, element1 in enumerate(individual):
+        #print(f"\n Individual is : {individual}")
+        #print(f"\n Individual StartEnd is : {individual_startEnd}")
+        #print(f"\n Possible startEnd: {self.possible_entry_and_exit_points_list}")
+        for idx, element1 in enumerate(individual_startEnd):
+            #print(f"\n Element1 is : {element1}")
+            cluster = individual[idx]
+            #print(f"\n Cluster is : {cluster}")
+            
          
             # Get a random index for the mutation
             if idx in mutation_indices:
                 
                 mutation_index = idx
+                #print(f"\n Mutation index is : {mutation_index}")
                 
-                possible_startEnd = self.possible_entry_and_exit_points_list[mutation_index]
+                possible_startEnd = self.possible_entry_and_exit_points_list[cluster]
+
+                #find if element 1 is in the possible startEnd
+                if not any(np.array_equal(element1, entry) for entry in possible_startEnd):
+                    print(f"\n EMERGENCY: Element 1 is not in the possible startEnd")
+                    print(f"\n Element 1 is: {element1} not in {possible_startEnd}")
+                    
+                  
+                #print(f"\n Possible startEnd is : {possible_startEnd}")
                 mutation_index2 = np.random.randint(len(possible_startEnd))
+                #print(f"\n Mutation index 2 is : {mutation_index2}")
 
                 mutated_startEnd[idx] = possible_startEnd[mutation_index2]
+                #print(f"\n Mutated Element 1 is : {mutated_startEnd[idx]}")
+                
+                
+              
 
                 #mutated_individual[i], mutated_individual[mutation_index] = mutated_individual[mutation_index], mutated_individual[i]
               
    
         #print(f"\n Mutated Individual is : {mutated_individual}")
+        #print(f"\n Mutated StartEnd is : {mutated_startEnd}")
         return mutated_startEnd
+    
+    
     
    
 
@@ -375,7 +403,7 @@ class GA_K_L2:
         Returns:
         - new_population: numpy array of shape (self.population_size, individual_size)
         """
-        print(f"\n ---------------- Eliminate Population ----------------")
+        #print(f"\n ---------------- Eliminate Population ----------------")
         # Combine the original population with the offspring
         #print(f"\n Orginial --> {population}")
         #print(f"\n Offspring--> {offspring}")
@@ -458,7 +486,7 @@ class GA_K_L2:
         
 
     def print_model_info(self):
-        print("\n------------- GA_Level1: -------------")
+        print("\n------------- GA_Level2: -------------")
         print(f"   * Model Info:")
         print(f"       - Population Size: {self.population_size}")
         print(f"       - Number of cities: {self.gen_size}")
@@ -480,7 +508,11 @@ class GA_K_L2:
         self.distance_matrix = self.check_inf(distance_matrix=distance_matrix,replace_value=100000)
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
-        self.population_size = 1*self.gen_size
+        if self.gen_size > 300:
+            self.population_size = 100
+        else:
+            self.population_size = int(self.gen_size/10)
+        
         
         self.k_tournament_k = int((3/100)*self.population_size)
         print(f"Distance matrix is {self.distance_matrix}")
@@ -703,6 +735,13 @@ class GA_K_L2:
         cluster_path = []
         #print(f"\n Cluster cities: {cluster_cities}")
         #print(f"\n Start city: {start_city}, End city: {end_city}")
+
+        if start_city not in cluster_cities or end_city not in cluster_cities:
+            print(f"\n Start city or end city not in cluster cities")
+            print(f"\n Start city: {start_city}, End city: {end_city}")
+            print(f"\n Cluster cities: {cluster_cities}")
+
+            
         
         # We need to ensure the path starts from the start city and ends at the end city
         # The cluster's path must go through all cities in the correct order
@@ -765,7 +804,7 @@ class GA_K_L2:
         Returns:
         - merged_population (np.ndarray): A list of full traveling paths for each individual
         """
-        print(f"\n ----------------- Merge Paths Given Start and End -----------------")
+        #print(f"\n ----------------- Merge Paths Given Start and End -----------------")
         #print(f"\n Population cluster: {population_cluster}")
         #print(f"\n Population startEnd: {population_startEnd}")
         merged_population = []
