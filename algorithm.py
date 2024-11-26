@@ -71,7 +71,7 @@ class algorithm:
         if model:
             num_cities = int(model.num_cities)
             if num_clusters is None:
-                num_clusters = math.ceil(num_cities/20)
+                num_clusters = math.ceil(num_cities/30)
             if min_cluster_size is None:
                 min_cluster_size = int(num_cities/60)
             #model.run_model( k=num_clusters, min_cluster_size=min_cluster_size) 
@@ -111,7 +111,7 @@ class algorithm:
         '''
         - Add the GA model
         '''
-        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42)
+        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42,local_search=local_search)
         model.set_distance_matrix(distance_matrix)
         self.GA_level1_model = model
 
@@ -259,6 +259,7 @@ class algorithm:
         final_fitness = 0
         final_solution = None
         print(f"Number of clusters: {len(self.cities_cluster_list)}")
+        
         print(self.cities_cluster_list)
 
         for cities in self.cities_cluster_list:

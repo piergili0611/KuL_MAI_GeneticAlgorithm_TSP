@@ -509,9 +509,9 @@ class GA_K_L2:
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
         if self.gen_size > 300:
-            self.population_size = 200
+            self.population_size = 100
         else:
-            self.population_size = 200
+            self.population_size = 50
         
         
         self.k_tournament_k = int((3/100)*self.population_size)
