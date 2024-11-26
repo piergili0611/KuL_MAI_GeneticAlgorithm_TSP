@@ -2,11 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import seaborn as sns
+import time 
 
 
 class GA_K_L2:
 
-    def __init__(self,clusters_solutions_matrix,cities_model,seed=None ,mutation_prob = 0.00,elitism_percentage = 20):
+    def __init__(self,clusters_solutions_matrix,cities_model,seed=None ,mutation_prob = 0.00,elitism_percentage = 20,local_search = False):
         #model_key_parameters
         #self.cities = cities 
         self.k_tournament_k = 3
@@ -28,18 +29,183 @@ class GA_K_L2:
 
       
         self.cities_model = cities_model
+
+        #Unique Solutions
+        self.num_unique_solutions_list = []
+        self.num_repeated_solutions_list = []
+
+        #Diversity: Hamming Distance
+        self.hamming_distance_list = []
+        self.hamming_distance_crossover_list = []
+        self.hamming_distance_crossoverOld_list = []
+        self.hamming_distance_mutation1_list = []
+        self.hamming_distance_mutation2_list = []
+        self.hamming_distance_elimination_list = []
+        self.hamming_distance_local_search_list = []
         
+        #Local Search
+        self.local_search = local_search
+
+        #Time
+        self.time_iteration_lists = []
+        self.time_initialization_list = []
+        self.time_selection_list = []
+        self.time_crossover_list = []
+        self.time_mutation_list = []
+        self.time_elimination_list = []
+        self.time_mutation_population_list = []
+        self.time_local_search_list = []
+        self.time_iteration_list = []
+    
 
         #Random seed
         if seed is not None:
             np.random.seed(seed)    
         
+    
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 0) Settings:------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    
+    def caclulate_numberRepeatedSolution(self,population):
+        '''
+        - Calculate the number of repeated solutions in the population
+        '''
+        self.num_unique_solutions = len(np.unique(population,axis=0))
+        self.num_repeated_solutions = len(population) - self.num_unique_solutions
+
+    def retieve_order_cities(self,best_solution):
+
+        '''
+        - Retrieve the order of the cities
+        '''
+        #print(f"\n Best solution is : {best_solution}")
+        #print(f"\n Cities are : {self.cities}")
         
+        self.best_solution_cities = self.cities[best_solution]
+
+        #print(f"\n Best solution cities are : {self.best_solution_cities}")
+
+    def print_model_info(self):
+        print("\n------------- GA_Level2: -------------")
+        print(f"   * Model Info:")
+        print(f"       - Population Size: {self.population_size}")
+        print(f"       - Number of cities: {self.gen_size}")
+        print(f"       - Number of clusters: {self.num_clusters}")
+        print(f"       - Cluster Soluitions: {self.clusters_solution_matrix}")
+        print(f"   * Model Parameters:")
+        print(f"       - K: {self.k_tournament_k}")
+        print(f"       - Mutation rate: {self.mutation_rate}")
+        print(f"       - Elitism percentage: {self.elistism} %")
+        print(f"   * Running model:")
+        
+    def set_distance_matrix(self,distance_matrix):
+        '''
+        - Set the distance matrix
+        '''
+        self.distance_matrix = self.check_inf(distance_matrix=distance_matrix,replace_value=100000)
+        self.gen_size = len(distance_matrix)
+        #self.population_size = 2*self.gen_size
+        if self.gen_size > 200:
+            self.population_size = 50
+        else:
+            self.population_size = 15
+        
+        
+        self.k_tournament_k = int((3/100)*self.population_size)
+        print(f"Distance matrix is {self.distance_matrix}")
+        #print(f"Gen size is {self.gen_size}")
+        print(f"Population size is {self.population_size}")
+
+
+    def check_inf(self,distance_matrix,replace_value=10000000):
+        '''
+        - Check if the distance matrix has inf values and replace them with a given value
+        '''
+        distance_matrix[distance_matrix == np.inf] = replace_value
+        return distance_matrix
+
+    def calculate_information_iteration(self):
+        '''
+        - Calculate the mean and best objective function value of the population
+        '''
+        self.mean_objective = np.mean(self.fitness)
+        self.best_objective = np.min(self.fitness)
+        self.mean_fitness_list.append(self.mean_objective)
+        self.best_fitness_list.append(self.best_objective)  
+        best_index = np.argmin(self.fitness)
+        best_solution = self.population_cluster[best_index]
+        self.best_solution_cities = self.population_cities[best_index]
+        #Unique and repeated solutions
+        self.caclulate_numberRepeatedSolution(population=self.population_cities)
+        self.num_unique_solutions_list.append(self.num_unique_solutions)
+        self.num_repeated_solutions_list.append(self.num_repeated_solutions)
+        #self.retieve_order_cities(best_solution_merged)    
+        #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution Clusters --> {best_solution} \n Best Solution Cities --> {self.best_solution_cities}")
+        return self.mean_objective,self.best_objective,best_solution
+    
+    def print_best_solution(self):
+        '''
+        - Print the best solution
+        '''
+        
+        print(f"\n Best solution is : {self.best_objective} \n Best solution cities are : {self.best_solution_cities}")
+    
+    def check_stopping_criteria(self):
+        '''
+        - Check the stopping criteria
+        '''
+        
+        if round(self.best_objective) == round(self.mean_objective):
+            return True
+        else:
+            return False
+
+    def update_time(self,time_initalization, time_selection, time_crossover, time_mutation, time_elimination,time_mutation_population,time_local_search,time_iteration):
+        '''
+        - Update the time
+        '''
+        self.time_initialization_list.append(time_initalization)
+        self.time_selection_list.append(time_selection)
+        self.time_crossover_list.append(time_crossover)
+        self.time_mutation_list.append(time_mutation)
+        self.time_elimination_list.append(time_elimination)
+        self.time_mutation_population_list.append(time_mutation_population)
+        self.time_local_search_list.append(time_local_search)
+        self.time_iteration_list.append(time_iteration)
+
+        new_lists = [self.time_initialization_list,self.time_selection_list,self.time_crossover_list,self.time_mutation_list,self.time_elimination_list,self.time_mutation_population_list,self.time_local_search_list,self.time_iteration_list]
+        self.time_iteration_lists.append(new_lists)
+
+    def combine_all_lists(self,all_list1,all_list2):
+        '''
+        - Combine all lists
+        '''
+        cluster_all_list1 = all_list1[0]
+        startEnd_all_list1 = all_list1[1]
+        cities_all_list1 = all_list1[2]
+
+        cluster_all_list2 = all_list2[0]
+        startEnd_all_list2 = all_list2[1]
+        cities_all_list2 = all_list2[2]
+
+        combined_cluster_all_list = np.vstack((cluster_all_list1, cluster_all_list2))
+        combined_startEnd_all_list = np.vstack((startEnd_all_list1, startEnd_all_list2))
+        combined_cities_all_list = np.vstack((cities_all_list1, cities_all_list2))
+
+        return [combined_cluster_all_list,combined_startEnd_all_list,combined_cities_all_list]
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 0) Run ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     def run_model(self):
+        
+        time_start = time.time()
         self.set_initialization()
+        time_end = time.time()
+        intialization_time = time_end - time_start 
         yourConvergenceTestsHere = False
-        num_iterations = 500
+        num_iterations = 300
         iterations = 0
         while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
             '''
@@ -47,25 +213,58 @@ class GA_K_L2:
             bestObjective = 0.0
             bestSolution = np.array([1,2,3,4,5])
             '''
+            time_start_iteration = time.time()
             iterations += 1
-            #print(f"\n Iteration number {iterations}")
+            print(f"\n Iteration number {iterations}")
+            time_start = time.time()
             parents_all_list = self.selection_k_tournament(num_individuals=self.population_size)    
-            offspring_all_list = self.crossover_singlepoint_population(parents_all_list)
-            
-        
-            mutated_all_list = self.mutation_singlepoint_population(offspring_all_list)    
+            time_end = time.time()
+            time_selection = time_end - time_start
 
+            time_start = time.time()
+            offspring_all_list = self.crossover_singlepoint_population(parents_all_list)
+            time_end = time.time()
+            time_crossover = time_end - time_start
+        
+            time_start = time.time()
+            mutated_all_list = self.mutation_singlepoint_population(offspring_all_list)
+            time_end = time.time()
+            time_mutation = time_end - time_start
+            
+            time_start = time.time()
+            self.population_all_list = self.mutation_singlepoint_population(self.population_all_list)    
+            time_end = time.time()
+            time_mutation_population = time_end - time_start
+
+            if self.local_search:
+                time_start = time.time()
+                if iterations % 2 == 0: 
+                    mutated_all_list = self.combine_all_lists(all_list1=self.population_all_list,all_list2=mutated_all_list)
+                    #mutated_all_list = self.local_search_population(population_all_list=mutated_all_list)
+                time_end = time.time()
+                time_local_search = time_end - time_start
+            else:
+                time_local_search = 0
+
+            time_start = time.time()
             self.eliminate_population(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list)
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
+            time_end = time.time()
+            time_elimination = time_end - time_start
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
             yourConvergenceTestsHere = False
-
+            time_end_iteration = time.time()
+            diff_time_iteration = time_end_iteration - time_start_iteration
+            self.update_time(time_initalization=intialization_time,time_selection=time_selection,time_crossover=time_crossover,time_mutation=time_mutation,time_elimination=time_elimination,time_mutation_population=time_mutation_population,time_local_search=time_local_search,time_iteration=diff_time_iteration)
         self.print_best_solution()
         self.plot_fitness_dynamic()
+        self.plot_timing_info()
         
         return 0
     
-
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 1) Initalization ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     def set_initialization(self):
         '''
@@ -99,6 +298,10 @@ class GA_K_L2:
         self.print_model_info()
 
 
+    #----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 2) Selection ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
     def selection_k_tournament(self, num_individuals, k=3):
         #print(f"\n ----------------- Selection K Tournament -----------------")
      
@@ -129,8 +332,6 @@ class GA_K_L2:
 
         return selected_all_list
     
-    
-    #make me a function that will select the best individuals from the population based on the k_tournament, given talso the fitness of that population
     def selection_k_tournament_population(self,num_individuals,population,fitness,k):
         '''
         - Select the best individuals from the population based on the k_tournament
@@ -156,11 +357,11 @@ class GA_K_L2:
         # Step 5: Return the selected individuals and its fitness
         return population[best_selected_indices],best_selected_fitness
     
-        
-        
-
-
     
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 4) Crossover & Mutation ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
     
     def crossover_singlepoint_population(self, selected_all_list):
         # Number of parents in the population
@@ -264,7 +465,7 @@ class GA_K_L2:
         return child1_end, child2_end, child1_end_startEnd, child2_end_startEnd
 
     
-    #make me a function teh remianing cities (marked qwith -1) with the cities from the parent2 efficiently with numpy functions
+    
     def fill_child(self,child,child_startEnd, other_parent,other_parent_startEnd):
 
         for idx, element1 in enumerate(child):
@@ -311,9 +512,11 @@ class GA_K_L2:
         mutated_population_startEnd = np.copy(population_startEnd)
         
         # Perform mutation for each individual
+        mutated_distance = self.calculate_fitness(mutated_population_cities)
+        best_index = np.argmin(mutated_distance)
         
         for i in range(num_individuals):
-            if np.random.rand() < mutation_rate:
+            if np.random.rand() < mutation_rate and i != best_index:
                 mutated_population_startEnd[i] = self.mutation_singlepoint(population_cluster[i],individual_startEnd=population_startEnd[i] ,mutation_rate=mutation_rate)
       
         merged_mutated_population = self.merge_paths_givenStartEnd(mutated_population_cluster,mutated_population_startEnd)
@@ -388,8 +591,107 @@ class GA_K_L2:
         return mutated_startEnd
     
     
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 5) Local Search ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
     
+    def calculate_total_distance_individual(self,route, distance_matrix):
+        '''
+        Calculate the total distance of a given route
+        '''
+        current_indices = route[:-1]
+        next_indices = route[1:]
+        distances = distance_matrix[current_indices, next_indices]
+        total_distance = np.sum(distances) + distance_matrix[route[-1], route[0]]  # Return to start
+        return total_distance
+
+    def two_opt_no_loops_opt(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
+        '''
+        Optimized 2-opt with reduced neighborhood search: focuses on the most promising swaps
+        '''
+        best_route = np.copy(route)
+        best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
+        n = len(route)
+        
+        improvement = True
+        iteration = 0
+        
+        while improvement and iteration < max_iterations:
+            improvement = False
+            
+            # Generate all pairs of indices i, j (i < j)
+            i_indices, j_indices = np.triu_indices(n, k=2)
+            
+            # Calculate the distance changes for all (i, j) pairs in parallel
+            i_next = (i_indices + 1) % n
+            j_next = (j_indices + 1) % n
+            
+            old_distances = (
+                distance_matrix[best_route[i_indices], best_route[i_next]] +
+                distance_matrix[best_route[j_indices], best_route[j_next]]
+            )
+            
+            new_distances = (
+                distance_matrix[best_route[i_indices], best_route[j_indices]] +
+                distance_matrix[best_route[i_next], best_route[j_next]]
+            )
+            
+            delta_distances = new_distances - old_distances
+            
+            # Identify the top k pairs with the largest improvement (most negative delta_distances)
+            top_k_indices = np.argsort(delta_distances)[:k_neighbors]
+            
+            # If there are any improving swaps in the top k, apply the best one
+            if np.any(delta_distances[top_k_indices] < 0):
+                improvement = True
+                best_swap_index = top_k_indices[np.argmin(delta_distances[top_k_indices])]
+                i, j = i_indices[best_swap_index], j_indices[best_swap_index]
+                
+                # Perform the 2-opt swap: reverse the segment between i and j
+                best_route[i + 1 : j + 1] = best_route[i + 1 : j + 1][::-1]
+                best_distance += delta_distances[best_swap_index]
+                #print(f"\n Best distance is : {best_distance}")
+            
+            # Stop if no improvement or improvement is very small
+            if not improvement or np.min(delta_distances[top_k_indices]) > min_improvement_threshold:
+                break
+            
+            iteration += 1
+
+        return best_route
+
    
+    def local_search_population(self, population_all_list, max_iterations=10):
+        '''
+        Optimized local search for the population: applies 2-opt to the top individuals
+        '''
+        distance_matrix = self.distance_matrix
+        population_clusters = population_all_list[0]
+        population_startEnd = population_all_list[1]
+        population_cities = population_all_list[2]
+
+
+        
+        # Step 1: Evaluate fitness for all individuals in the population
+        distances = self.calculate_fitness(population_cities)
+        
+        # Step 2: Select the top `n_best` individuals
+        n_best = 2  # Or set to the desired number of top individuals
+        best_indices = np.argsort(distances)[:n_best]
+        
+        # Step 3: Apply 2-opt to the selected top individuals
+        for i in best_indices:
+            population_cities[i] = self.two_opt_no_loops_opt(population_cities[i], distance_matrix, max_iterations,k_neighbors=10)
+            #population[i] = self.two_opt_no_loops(population[i], distance_matrix, max_iterations)
+        after_all_list = [population_clusters,population_startEnd,population_cities]
+        return after_all_list
+
+
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 5) Elimnation ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
     def eliminate_population(self, population_all_list, mutated_all_list):
         """
@@ -426,104 +728,27 @@ class GA_K_L2:
        
 
         # Get the indices of the best individuals based on fitness
-        
-        best_indices = np.argsort(combined_fitness)[:self.population_size]
-        self.fitness = combined_fitness[best_indices]
+        unique_population_cities, unique_indices = np.unique(combined_population_cities, axis=0, return_index=True)
+        # Get the fitness scores of unique individuals
+        unique_fitness_scores = combined_fitness[unique_indices]
+        unique_population = combined_population[unique_indices]
+        unique_population_startEnd = combined_population_startEnd[unique_indices]
+      
+        best_indices = np.argsort(unique_fitness_scores)[:self.population_size]
+        self.fitness = unique_fitness_scores[best_indices]
 
         # Select the best individuals
-        self.population_cluster = combined_population[best_indices]
-        self.population_startEnd = combined_population_startEnd[best_indices]
-        self.population_cities = combined_population_cities[best_indices]  
+        self.population_cluster = unique_population[best_indices]
+        self.population_startEnd = unique_population_startEnd[best_indices]
+        self.population_cities = unique_population_cities[best_indices]  
         self.population_all_list = [self.population_cluster,self.population_startEnd,self.population_cities] 
-        self.fitness = combined_fitness[best_indices]
+        self.fitness = unique_fitness_scores[best_indices]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def retieve_order_cities(self,best_solution):
-
-        '''
-        - Retrieve the order of the cities
-        '''
-        #print(f"\n Best solution is : {best_solution}")
-        #print(f"\n Cities are : {self.cities}")
-        
-        self.best_solution_cities = self.cities[best_solution]
-
-        #print(f"\n Best solution cities are : {self.best_solution_cities}")
-
-        
-
-    def print_model_info(self):
-        print("\n------------- GA_Level2: -------------")
-        print(f"   * Model Info:")
-        print(f"       - Population Size: {self.population_size}")
-        print(f"       - Number of cities: {self.gen_size}")
-        print(f"       - Number of clusters: {self.num_clusters}")
-        print(f"       - Cluster Soluitions: {self.clusters_solution_matrix}")
-        print(f"   * Model Parameters:")
-        print(f"       - K: {self.k_tournament_k}")
-        print(f"       - Mutation rate: {self.mutation_rate}")
-        print(f"       - Elitism percentage: {self.elistism} %")
-        print(f"   * Running model:")
-        
-
-        
-
-    def set_distance_matrix(self,distance_matrix):
-        '''
-        - Set the distance matrix
-        '''
-        self.distance_matrix = self.check_inf(distance_matrix=distance_matrix,replace_value=100000)
-        self.gen_size = len(distance_matrix)
-        #self.population_size = 2*self.gen_size
-        if self.gen_size > 300:
-            self.population_size = 100
-        else:
-            self.population_size = 50
-        
-        
-        self.k_tournament_k = int((3/100)*self.population_size)
-        print(f"Distance matrix is {self.distance_matrix}")
-        #print(f"Gen size is {self.gen_size}")
-        print(f"Population size is {self.population_size}")
-
-
-
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 6) Merging Paths ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     
-
     def greedyMerge_populationClusters(self,population):
         """
         Merges clusters in a greedy manner by iterating through the solution array,
@@ -613,14 +838,6 @@ class GA_K_L2:
 
         return np.array(population_merged)
        
-
-          
-
-           
-
-
-
-
 
     def generate_possible_entries_and_exit_points(self):
         """
@@ -846,87 +1063,9 @@ class GA_K_L2:
 
 
 
-    
-
-
-
-    
-                
-
-
-        #--------------------------------------------------------------- GA_Algorithm ---------------------------------------------------------------
-        #--------------------------------------------------------------- GA_Algorithm ---------------------------------------------------------------
-        #--------------------------------------------------------------- GA_Algorithm ---------------------------------------------------------------
-        #--------------------------------------------------------------- GA_Algorithm ---------------------------------------------------------------
-        #--------------------------------------------------------------- GA_Algorithm ---------------------------------------------------------------
-        #--------------------------------------------------------------- GA_Algorithm ---------------------------------------------------------------
-
-    
-    def check_inf(self,distance_matrix,replace_value=10000000):
-        '''
-        - Check if the distance matrix has inf values and replace them with a given value
-        '''
-        distance_matrix[distance_matrix == np.inf] = replace_value
-        return distance_matrix
-    
-
-
-
-    
-    
-
-    def eliminate_population_elitism(self,population,offsprings):
-        '''
-        - Eliminate the population based on the elitism percentage. FOr the rest of the population use the k_tournament function
-        '''
-        #print(f"-----ELIMINATEWITH ELÑITISM FUNCTION-----")
-
-        # 1) Combine the original population with the offspring
-        combined_population = np.vstack((population, offsprings))
-
-        # 2) Calculate fitness for the combined population
-        fitness_scores = self.calculate_fitness(offsprings)
-        combined_fitness = np.hstack((self.fitness, fitness_scores))
-        #print(f"\n Combined population -> {combined_population} \n Combined fitness -> {combined_fitness}")
-       
-
-        # 3) Get the elite population based on the elitism percentage
-        elitism_size = int((self.elistism/100)*self.population_size)
-        best_indices = np.argsort(combined_fitness)[:elitism_size]
-        best_indv = combined_population[best_indices]
-        #print(f"\n Elite population -> {combined_population[best_indices]} \n Elite fitness -> {combined_fitness[best_indices]}")
-
-        # 4) Get the remaining population size
-        remaining_size = self.population_size - elitism_size
-        remaining_population = combined_population[np.argsort(combined_fitness)[elitism_size:]]
-        remaining_population_fitness = self.calculate_fitness(remaining_population)
-        #print(f"\n Remaining population -> {remaining_population} \n Remaining fitness -> {remaining_population_fitness}")	
-
-        
-
-        # 5) Select the best individuals from the remaining population based on the k_tournament
-        remaining_population_ordered, remaining_population_fitness_ordered = self.selection_k_tournament_population(num_individuals=remaining_size, population=remaining_population, fitness=remaining_population_fitness, k=self.k_tournament_k)
-
-
-        # Print the elite population and the remaining population ordered
-        #print(f"\n Elite population -> {best_indv} \n Remaining population ordered -> {remaining_population_ordered}")
-
-
-        self.population = np.vstack((best_indv,remaining_population_ordered))
-        self.fitness = self.calculate_fitness(self.population)
-        
-        
-        
-
-   
-
-        #print(f"---- END ELIMNATION ELITISM------")
-       
-
-        
-
-      
-
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 7) Fitness Calculation ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
     def calculate_fitness(self,population):
@@ -960,178 +1099,17 @@ class GA_K_L2:
         
 
         
-
-
-        
-
         #print(f"Fitness shape --> {np.shape(fitness)} \n Fitness is : {fitness}") 
         
         return fitness
-    
-    def check_stopping_criteria(self):
-        '''
-        - Check the stopping criteria
-        '''
-        
-        if round(self.best_objective) == round(self.mean_objective):
-            return True
-        else:
-            return False
 
+
+
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 8) Plotting------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     
-
-    def calculate_information_iteration(self):
-        '''
-        - Calculate the mean and best objective function value of the population
-        '''
-        self.mean_objective = np.mean(self.fitness)
-        self.best_objective = np.min(self.fitness)
-        self.mean_fitness_list.append(self.mean_objective)
-        self.best_fitness_list.append(self.best_objective)  
-        best_index = np.argmin(self.fitness)
-        best_solution = self.population_cluster[best_index]
-        self.best_solution_cities = self.population_cities[best_index]
-        #self.retieve_order_cities(best_solution_merged)    
-        #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution Clusters --> {best_solution} \n Best Solution Cities --> {self.best_solution_cities}")
-        return self.mean_objective,self.best_objective,best_solution
-    
-    def print_best_solution(self):
-        '''
-        - Print the best solution
-        '''
-        
-        print(f"\n Best solution is : {self.best_objective} \n Best solution cities are : {self.best_solution_cities}")
-    
-    
-
-
-
-
-
-
-
-
-
-
-
-    def plot_distance_matrix(self):
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(self.distance_matrix, cmap='viridis', annot=False)
-        plt.title('Distance Matrix Heatmap')
-        plt.xlabel('City Index')
-        plt.ylabel('City Index')
-        plt.show()
-
-    def plot_circles(self,circles):
-        circle1 = circles[0]
-        circle2 = circles[1]
-        circle3 = circles[2]
-
-        circle1_x = []
-        circle1_y = []
-        circle2_x = []
-        circle2_y = []
-        circle3_x = []
-        circle3_y = []
-
-        for i in range(len(circle1)):
-            #print(circle1[i])
-            circle1_x.append(circle1[i][0])
-            circle1_y.append(circle1[i][1])
-            circle2_x.append(circle2[i][0])
-            circle2_y.append(circle2[i][1])
-            circle3_x.append(circle3[i][0])
-            circle3_y.append(circle3[i][1])
-
-        
-        print(f"Circle_1 x: {circle1_x}")
-
-        
-        # Create a plotly figure
-        fig = go.Figure()
-
-        # Add the best fitness trace
-        fig.add_trace(go.Scatter(
-            x=circle1_x,
-            y=circle1_y,
-            mode='lines+markers',
-            name='Circle 1',
-            line=dict(color='blue'),
-            marker=dict(symbol='circle')
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=circle2_x,
-            y=circle2_y,
-            mode='lines+markers',
-            name='Circle 2',
-            line=dict(color='orange'),
-            marker=dict(symbol='x')
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=circle3_x,
-            y=circle3_y,
-            mode='lines+markers',
-            name='Circle 3',
-            line=dict(color='red'),
-            marker=dict(symbol='x')
-        ))
-
-        
-
-
-        # Set the title and axis labels
-        fig.update_layout(
-            title=f'Circles',
-            xaxis_title='X',
-            yaxis_title='Y',
-            legend=dict(x=0, y=1),
-            hovermode='x'
-        )
-
-        # Show the plot
-        fig.show()
-        
-
-
-
-
-    def plot_fitness(self):
-        # Create a figure and axis object
-        fig, ax = plt.subplots(figsize=(10, 5))
-
-        # Plot the best and mean fitness values
-        ax.plot(self.best_fitness_list, label='Best Distance', color='blue', marker='o')
-        ax.plot(self.mean_fitness_list, label='Mean Distance', color='orange', marker='x')
-
-        # Get the last iteration's best and mean fitness
-        last_best_fitness = self.best_fitness_list[-1]
-        last_mean_fitness = self.mean_fitness_list[-1]
-
-        # Add text to the plot for the last iteration's fitness
-        ax.text(x=len(self.best_fitness_list) - 1, 
-                y=last_best_fitness, 
-                s=f'Best: {last_best_fitness}\nMean: {last_mean_fitness}', 
-                fontsize=10, 
-                verticalalignment='bottom', 
-                horizontalalignment='right',
-                bbox=dict(facecolor='white', alpha=0.5, edgecolor='black'))
-
-        # Set titles and labels
-        ax.set_title(f'Distance over Iterations with mutation rate {self.mutation_rate * 100} %')
-        ax.set_xlabel('Iterations')
-        ax.set_ylabel('Distance')
-
-        # Show the legend and grid
-        ax.legend()
-        ax.grid()
-
-        # Return the figure object
-        
-
-
     def plot_fitness_dynamic(self):
         # Create a plotly figure
         fig = go.Figure()
@@ -1189,4 +1167,113 @@ class GA_K_L2:
         # Show the plot
         fig.show()
 
+        #Plotting unique solutions
+        # Create the first plot for Best and Mean Objective values
+        fig_obj = go.Figure()
+
+        # Add the best objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(self.num_unique_solutions_list))),
+            y=self.num_unique_solutions_list,
+            mode='lines+markers',
+            name='Num Unique Solutions',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(self.num_repeated_solutions_list ))),
+            y=self.num_repeated_solutions_list,
+            mode='lines+markers',
+            name=' Num Repeated Solutions',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+       
+        # Set the title and axis labels for the objective plot
+        fig_obj.update_layout(
+            title=f'Number of unique solutions and repeated solution over Iterations with mutation rate {self.mutation_rate*100} %',
+            xaxis_title='Iterations',
+            yaxis_title='Number Unique and Repeated solutions',
+            legend=dict(x=0, y=1),
+            hovermode='x'
+            
+        )
+
+        # Show the first plot
+        fig_obj.show()
+
         
+
+    def plot_timing_info(self):
+        """
+        Plot timing information for each stage of the genetic algorithm over iterations.
+        """
+        # Create a figure for the timing information
+        fig_time = go.Figure()
+
+        # Add a trace for each timing component
+        timing_labels = [
+            "Initialization", "Selection", "Crossover", "Mutation",
+            "Elimination", "Mutation Population", "Local Search", "Total Iteration"
+        ]
+        timing_lists = [
+            self.time_initialization_list, self.time_selection_list, self.time_crossover_list,
+            self.time_mutation_list, self.time_elimination_list, self.time_mutation_population_list,
+            self.time_local_search_list, self.time_iteration_list
+        ]
+
+        colors = ["blue", "orange", "green", "red", "purple", "brown", "pink", "black"]  # Assign colors to each process
+
+        # Add each timing list to the plot
+        for label, time_list, color in zip(timing_labels, timing_lists, colors):
+            fig_time.add_trace(go.Scatter(
+                x=list(range(len(time_list))),
+                y=time_list,
+                mode='lines+markers',
+                name=label,
+                line=dict(color=color),
+                marker=dict(symbol='circle')
+            ))
+
+        # Add annotations for the last iteration's timing values
+        for i, (label, time_list) in enumerate(zip(timing_labels, timing_lists)):
+            if time_list:  # Ensure the list is not empty
+                fig_time.add_annotation(
+                    x=len(time_list) - 1,
+                    y=time_list[-1],
+                    text=f'{label}: {time_list[-1]:.2f}s',
+                    showarrow=True,
+                    arrowhead=2,
+                    ax=-20 * (i + 1),  # Offset annotations for readability
+                    ay=-40,
+                    bgcolor='white',
+                    bordercolor='black'
+                )
+
+        # Set the title and axis labels for the timing plot
+        fig_time.update_layout(
+            title='Timing Information Over Iterations',
+            xaxis_title='Iterations',
+            yaxis_title='Time (seconds)',
+            legend=dict(x=1, y=1),
+            hovermode='x',
+        )
+
+        # Show the timing plot
+        fig_time.show()
+
+
+
+
+
+
+
+
+
+
+
+
+    

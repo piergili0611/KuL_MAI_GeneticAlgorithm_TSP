@@ -18,7 +18,7 @@ class k_clusters:
         '''
         print("\n---------- KMedoids Clustering: ------")
         # Replace np.inf with a large number
-        self.distance_matrix[self.distance_matrix == np.inf] = 1e8
+        self.distance_matrix[self.distance_matrix == np.inf] = 1e5
         print(f"Distance matrix: {self.distance_matrix}")
 
         # K-Medoids clustering using a precomputed distance matrix

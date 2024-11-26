@@ -71,7 +71,7 @@ class algorithm:
         if model:
             num_cities = int(model.num_cities)
             if num_clusters is None:
-                num_clusters = math.ceil(num_cities/20)
+                num_clusters = math.ceil(num_cities/40)
             if min_cluster_size is None:
                 min_cluster_size = int(num_cities/60)
             #model.run_model( k=num_clusters, min_cluster_size=min_cluster_size) 
@@ -139,11 +139,11 @@ class algorithm:
     #--------------------------------------------------------------------- 4) GA_Level2 ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def add_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,mutation_prob=0.8):
+    def add_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,mutation_prob=0.8,local_search=True):
         '''
         - Add the GA model
         '''
-        model = GA_K_L2(clusters_solutions_matrix=cluster_solutions_matrix,cities_model=self.cities_model,mutation_prob=mutation_prob,seed=42)
+        model = GA_K_L2(clusters_solutions_matrix=cluster_solutions_matrix,cities_model=self.cities_model,mutation_prob=mutation_prob,seed=42,local_search=local_search)
         model.set_distance_matrix(distance_matrix)
         self.GA_level2_model = model
 
@@ -153,11 +153,11 @@ class algorithm:
         '''
         self.GA_level2_model.run_model()
     
-    def add_run_GA_level2_model(self,distance_matrix,cluster_solutions_matrix):
+    def add_run_GA_level2_model(self,distance_matrix,cluster_solutions_matrix,local_search=True):
         '''
         - Add and run the GA model
         '''
-        self.add_GA_level2_model(distance_matrix=distance_matrix,cluster_solutions_matrix=cluster_solutions_matrix)
+        self.add_GA_level2_model(distance_matrix=distance_matrix,cluster_solutions_matrix=cluster_solutions_matrix,local_search=local_search)
         self.run_GA_level2_model()
     
     def GA_level2_model_retrieveBestSolution(self,fitness=True):
@@ -286,7 +286,7 @@ class algorithm:
         if clusters:
             
             time_start_GA_level2 = time.time()
-            self.add_run_GA_level2_model(distance_matrix=self.distance_matrix,cluster_solutions_matrix=self.clusters_solution_list)
+            self.add_run_GA_level2_model(distance_matrix=self.distance_matrix,cluster_solutions_matrix=self.clusters_solution_list,local_search=local_search)
             final_solution, final_fitness = self.GA_level2_model_retrieveBestSolution(fitness=True)
             time_end_GA_level2 = time.time()
             delta_time = time_end_GA_level2-time_start_GA_level2
@@ -331,7 +331,7 @@ class algorithm:
         # 2) Create and run Higher level GA model
         if clusters:
             time_start_GA_level2 = time.time()
-            self.add_run_GA_level2_model(distance_matrix=self.distance_matrix,cluster_solutions_matrix=self.clusters_solution_list)
+            self.add_run_GA_level2_model(distance_matrix=self.distance_matrix,cluster_solutions_matrix=self.clusters_solution_list,local_search=local_search)
             final_solution, final_fitness = self.GA_level2_model_retrieveBestSolution(fitness=True)
             time_end_GA_level2 = time.time()
             delta_time = time_end_GA_level2-time_start_GA_level2

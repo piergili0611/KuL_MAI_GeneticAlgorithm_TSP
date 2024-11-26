@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import seaborn as sns
 import time
+from numba import jit
+from itertools import combinations
 
 class GA_K:
 
@@ -12,7 +14,7 @@ class GA_K:
         self.k_tournament_k = 3
         self.population_size = 0.0
         #self.mutation_rate = mutation_prob
-        self.mutation_rate = 0.1
+        self.mutation_rate = 0.8
         self.elistism = 1                   #Elitism rate as a percentage
 
 
@@ -114,7 +116,7 @@ class GA_K:
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
         if self.gen_size < 200:
-            self.population_size = 50
+            self.population_size = 15
         else:
             self.population_size = 15
 
@@ -169,6 +171,7 @@ class GA_K:
         #print(f"Mean Objective --> {self.mean_objective} \n Best Objective --> {self.best_objective} \n Best Solution --> {best_solution}")
 
         #Diversity: Hamming Distance
+        
         self.hamming_distance_list.append(self.hamming_distance)
 
         #Unique and repeated solutions
@@ -214,11 +217,15 @@ class GA_K:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     def run_model(self):
-        
+        time_start = time.time()
+        #self.set_initialization()
+        self.set_initialization_onlyValid_numpy_incremental(fitness_threshold=1e5)
+        time_end = time.time()
+        initialization_time = time_end - time_start 
         
         #self.set_initialization_onlyValid_numpy(fitness_threshold=1e5)
         yourConvergenceTestsHere = False
-        num_iterations = 500
+        num_iterations = 300
         iterations = 0
         while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
             '''
@@ -226,12 +233,8 @@ class GA_K:
             bestObjective = 0.0
             bestSolution = np.array([1,2,3,4,5])
             '''
-            if iterations == 0:
-                time_start = time.time()
-                self.set_initialization()
-                #self.set_initialization_onlyValid_numpy_incremental(fitness_threshold=1e6)
-                time_end = time.time()
-                initialization_time = time_end - time_start 
+          
+                
                 
             time_start_iteration = time.time()
             iterations += 1
@@ -272,11 +275,11 @@ class GA_K:
 
             if self.local_search:
                 time_start = time.time()
-                #offspring_mutated = np.vstack((offspring_mutated,self.population))
-                #only do this after each 15 iterations
-                
-
-                offspring_mutated= self.local_search_population(offspring_mutated,max_iterations=50)
+                offspring_mutated = np.vstack((offspring_mutated,self.population))
+                #only do this after each 15 iteration
+                offspring_mutated= self.local_search_population_2opt(offspring_mutated,max_iterations=10)
+                #offspring_mutated= self.local_search_population_3opt(offspring_mutated,max_iterations=50)
+                #offspring_mutated= self.local_search_population_jit(offspring_mutated,max_iterations=50)
                 time_end = time.time()
                 time_local_search = time_end - time_start
                 self.calculate_add_hamming_distance(population=offspring_mutated,local_search=True)
@@ -286,12 +289,13 @@ class GA_K:
                
             
             time_start = time.time()
-            self.eliminate_population(population=self.population, offsprings=offspring_mutated)
+            #self.eliminate_population(population=self.population, offsprings=offspring_mutated)
             #self.elimnation_population_lamdaMu(population=self.population, offsprings=offspring_mutated)
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
             #self.eliminate_population_kTournamenElitism(population=self.population, offsprings=offspring_mutated,elitism_percentage=self.elistism)
             #self.check_insert_individual(num_iterations=100,threshold_percentage = 20)
-            #self.eliminate_population_fs(population=self.population, offsprings=offspring_mutated, sigma=0.5, alpha=1)
+            self.eliminate_population_fs(population=self.population, offsprings=offspring_mutated, sigma=0.9, alpha=0.1)
+            #self.eliminate_population_fs_tournament(population=self.population, offsprings=offspring_mutated, sigma=0.1, alpha=0.1, k=3)
             time_end = time.time()
             time_elimination = time_end - time_start
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
@@ -303,9 +307,10 @@ class GA_K:
             self.update_time(time_initalization=initialization_time,time_selection=selection_time,time_crossover=time_crossover,time_mutation=time_mutation,time_elimination=time_elimination,time_mutation_population=time_mutation_population,time_local_search=time_local_search,time_iteration=diff_time_iteration)
 
 
-        self.print_best_solution()
+        #self.print_best_solution()
         self.plot_fitness_dynamic()
         self.plot_timing_info()
+        
         
         return 0
 
@@ -431,7 +436,9 @@ class GA_K:
                     valid_distances = remaining_distances[valid_cities_mask]
 
                     # Select the city with the minimum distance
+                    random_index = np.random.choice(len(valid_cities))
                     best_city_idx = np.argmax(valid_distances)
+                    #best_city_idx = random_index
                     best_city = valid_cities[best_city_idx]
 
                     # Assign the best city to the current position in the route
@@ -540,7 +547,7 @@ class GA_K:
         '''
     
         # Step 1: Randomly choose k individuals for each tournament
-        tournament_indices = np.random.choice(population.shape[0], size=(num_individuals, k), replace=True)
+        tournament_indices = np.random.choice(population.shape[0], size=(num_individuals, k), replace=False)
         #print(f"\n tournament indices: {tournament_indices}")
 
         # Step 2: Get the fitness scores of the selected individuals
@@ -809,7 +816,26 @@ class GA_K:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 5) Local Search ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
+    
+    # Optimized Local Search Function
+    def local_search_population_jit(self, population, max_iterations=10, k_neighbors=10, min_improvement_threshold=100):
+        '''
+        Optimized local search for the population: applies 2-opt to the top individuals
+        '''
+        distance_matrix = self.distance_matrix
+        
+        # Step 1: Evaluate fitness for all individuals in the population
+        distances = self.calculate_distance_population(population)
+        
+        # Step 2: Select the top `n_best` individuals
+        n_best = 2  # Or set to the desired number of top individuals
+        best_indices = np.argsort(distances)[:n_best]
+        
+        # Step 3: Apply 2-opt to the selected top individuals
+        for i in best_indices:
+            population[i] = two_opt_no_loops_optimized_jit(population[i], distance_matrix, max_iterations, k_neighbors, min_improvement_threshold)
+        
+        return population
 
    
     def calculate_total_distance_individual(self,route, distance_matrix):
@@ -835,6 +861,7 @@ class GA_K:
         
         while improvement and iteration < max_iterations:
             improvement = False
+            #print(f"\n Iteration number {iteration}")
             
             # Generate all pairs of indices i, j (i < j)
             i_indices, j_indices = np.triu_indices(n, k=2)
@@ -868,14 +895,42 @@ class GA_K:
                 best_route[i + 1 : j + 1] = best_route[i + 1 : j + 1][::-1]
                 best_distance += delta_distances[best_swap_index]
             
+            
             # Stop if no improvement or improvement is very small
-            if not improvement or np.min(delta_distances[top_k_indices]) > min_improvement_threshold:
-                break
+            
             
             iteration += 1
+            
+        
 
         return best_route
 
+    def local_search_population_2opt(self, population, max_iterations=10):
+        '''
+        Optimized local search for the population: applies 2-opt to the top individuals
+        '''
+        distance_matrix = self.distance_matrix
+        
+        # Step 1: Evaluate fitness for all individuals in the population
+        distances = self.calculate_distance_population(population)
+        
+        # Step 2: Select the best individual explicitly
+        n_best = 1  # Or set to the desired number of top individuals
+        best_indices = np.argsort(distances)[:n_best]
+
+        
+
+
+        
+        
+        # Step 3: Apply 2-opt to the selected top individuals
+        for i in best_indices:
+            #print(f"\n Individual {i}")
+            population[i] = self.two_opt_no_loops_opt(population[i], distance_matrix, max_iterations,k_neighbors=10)
+            #population[i] = self.two_opt_no_loops(population[i], distance_matrix, max_iterations)
+        
+        return population
+    
     def two_opt_no_loops(self,route, distance_matrix, max_iterations=10):
         '''
         Loop-reduced 2-opt implementation using vectorized operations
@@ -919,9 +974,103 @@ class GA_K:
 
         return best_route
     
-    def local_search_population(self, population, max_iterations=10):
+    def three_opt_no_loops_opt(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
         '''
-        Optimized local search for the population: applies 2-opt to the top individuals
+        Optimized 3-opt with reduced neighborhood search: focuses on the most promising swaps
+        '''
+        best_route = np.copy(route)
+        best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
+        n = len(route)
+        
+        improvement = True
+        iteration = 0
+        
+    def three_opt_no_loops_opt(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
+        '''
+        Optimized 3-opt with reduced neighborhood search: focuses on the most promising swaps
+        '''
+        best_route = np.copy(route)
+        best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
+        n = len(route)
+        
+        improvement = True
+        iteration = 0
+        
+        while improvement and iteration < max_iterations:
+            improvement = False
+            
+            # Generate all triplets of indices (i < j < k)
+            i_indices, j_indices, k_indices = zip(*combinations(range(n), 3))
+            
+            # Convert to numpy arrays for element-wise operations
+            i_indices = np.array(i_indices)
+            j_indices = np.array(j_indices)
+            k_indices = np.array(k_indices)
+            
+            # Calculate the distance changes for all (i, j, k) triplets in parallel
+            i_next = (i_indices + 1) % n
+            j_next = (j_indices + 1) % n
+            k_next = (k_indices + 1) % n
+            
+            old_distances = (
+                distance_matrix[best_route[i_indices], best_route[i_next]] +
+                distance_matrix[best_route[j_indices], best_route[j_next]] +
+                distance_matrix[best_route[k_indices], best_route[k_next]]
+            )
+            
+            # We now test all 3 possible ways of reconnecting the triplet of indices (i, j, k)
+            new_distances_1 = (
+                distance_matrix[best_route[i_indices], best_route[j_indices]] +
+                distance_matrix[best_route[i_next], best_route[k_indices]] +
+                distance_matrix[best_route[j_next], best_route[k_next]]
+            )
+            
+            new_distances_2 = (
+                distance_matrix[best_route[i_indices], best_route[k_indices]] +
+                distance_matrix[best_route[j_indices], best_route[i_next]] +
+                distance_matrix[best_route[j_next], best_route[k_next]]
+            )
+            
+            new_distances_3 = (
+                distance_matrix[best_route[i_indices], best_route[k_indices]] +
+                distance_matrix[best_route[j_indices], best_route[i_next]] +
+                distance_matrix[best_route[i_next], best_route[j_next]]
+            )
+            
+            # Calculate the distance changes for each new configuration
+            delta_distances = np.minimum(new_distances_1, np.minimum(new_distances_2, new_distances_3)) - old_distances
+            
+            # Identify the top k triplets with the largest improvement (most negative delta_distances)
+            top_k_indices = np.argsort(delta_distances)[:k_neighbors]
+            
+            # If there are any improving swaps in the top k, apply the best one
+            if np.any(delta_distances[top_k_indices] < 0):
+                improvement = True
+                best_swap_index = top_k_indices[np.argmin(delta_distances[top_k_indices])]
+                i, j, k = i_indices[best_swap_index], j_indices[best_swap_index], k_indices[best_swap_index]
+                
+                # Perform the 3-opt swap: apply the best of the 3 reconnections
+                if delta_distances[best_swap_index] == new_distances_1[best_swap_index] - old_distances[best_swap_index]:
+                    best_route[j+1:k+1] = best_route[j+1:k+1][::-1]
+                elif delta_distances[best_swap_index] == new_distances_2[best_swap_index] - old_distances[best_swap_index]:
+                    best_route[i+1:j+1] = best_route[i+1:j+1][::-1]
+                    best_route[j+1:k+1] = best_route[j+1:k+1][::-1]
+                else:
+                    best_route[i+1:k+1] = best_route[i+1:k+1][::-1]
+                
+                best_distance += delta_distances[best_swap_index]
+            
+            # Stop if no improvement or improvement is very small
+            if not improvement or np.min(delta_distances[top_k_indices]) > min_improvement_threshold:
+                break
+            
+            iteration += 1
+
+        return best_route
+
+    def local_search_population_3opt(self, population, max_iterations=10):
+        '''
+        Optimized local search for the population: applies 3-opt to the top individuals
         '''
         distance_matrix = self.distance_matrix
         
@@ -932,24 +1081,89 @@ class GA_K:
         n_best = 2  # Or set to the desired number of top individuals
         best_indices = np.argsort(distances)[:n_best]
         
-        # Step 3: Apply 2-opt to the selected top individuals
+        # Step 3: Apply 3-opt to the selected top individuals
         for i in best_indices:
-            population[i] = self.two_opt_no_loops_opt(population[i], distance_matrix, max_iterations,k_neighbors=10)
-            #population[i] = self.two_opt_no_loops(population[i], distance_matrix, max_iterations)
+            population[i] = self.three_opt_no_loops_opt(population[i], distance_matrix, max_iterations, k_neighbors=10)
         
         return population
+    
 
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 5) Elimnation ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    
+    def eliminate_population_fs_tournament(self, population, offsprings, sigma, alpha, k):
+        '''
+        - Elimination with fitness sharing for TSP using k-tournament selection, ensuring the best individual is always selected,
+        and no duplicates are selected during the process.
+        '''
+        # 1) Combine population & calculate their fitness
+        combined_population = np.vstack((population, offsprings))
+        
+        combined_fitness, _, _ = self.fitness_function_calculation(
+            population=combined_population, 
+            weight_distance=self.weight_distance, 
+            weight_bdp=self.weight_bdp, 
+            distance_matrix=self.distance_matrix
+        )
+        
+        # 2) Initialize survivors
+        survivors_idxs = -1 * np.ones(self.population_size, dtype=int)  # Initialize survivors
+        
+        # Select the best individual (lowest fitness) and store in the first slot
+        best_index = np.argmin(combined_fitness)
+        survivors_idxs[0] = best_index
+
+        # Exclude the best individual from valid candidates
+        valid_candidates = np.setdiff1d(np.arange(len(combined_population)), [best_index])
+
+        # 3) Perform k-tournament selection for the remaining survivors
+        for i in range(1, self.population_size):
+            print(f"Selecting survivor {i + 1}/{self.population_size}")
+            
+            # Compute fitness sharing for the remaining individuals
+            new_fitness = self.fitness_sharing_individual_np(
+                population=combined_population, 
+                survivors=survivors_idxs[:i],  # Pass only the selected survivors so far
+                population_fitness=combined_fitness, 
+                sigma=sigma, 
+                alpha=alpha
+            )
+            
+            # Randomly select k candidates from the valid candidates
+            if len(valid_candidates) > 0:  # Ensure we have valid candidates
+                tournament_candidates = np.random.choice(valid_candidates, size=min(k, len(valid_candidates)), replace=False)
+            else:
+                raise ValueError("No valid candidates remain for selection.")
+            
+            # Select the individual with the best fitness from the tournament
+            best_in_tournament = tournament_candidates[np.argmin(new_fitness[tournament_candidates])]
+            
+            # Add the best candidate to survivors
+            survivors_idxs[i] = best_in_tournament
+            
+            # Remove the selected candidate from valid candidates
+            valid_candidates = valid_candidates[valid_candidates != best_in_tournament]
+            
+            # If valid_candidates is empty before filling the population, break early (unlikely edge case)
+            if len(valid_candidates) == 0 and i < self.population_size - 1:
+                print("Warning: Not enough unique individuals to fill the population.")
+                break
+        
+        # 4) Select the best individuals from the combined population
+        self.population = combined_population[survivors_idxs]
+        self.fitness = combined_fitness[survivors_idxs]
+        self.distance_scores = self.calculate_distance_population(self.population)
+        self.average_bpd_scores = self.average_bpd(self.population)
+        self.hamming_distance, _ = self.calculate_hamming_distance_population(self.population)
+
     def eliminate_population_fs(self, population, offsprings, sigma, alpha):
         '''
         - Elimination with fitness sharing for TSP
         '''
         # 1) Combine population & calculate their fitness
         combined_population = np.vstack((population, offsprings))
+        
 
         combined_fitness, _, _ = self.fitness_function_calculation(population=combined_population, 
                                                                 weight_distance=self.weight_distance, 
@@ -957,84 +1171,29 @@ class GA_K:
                                                                 distance_matrix=self.distance_matrix)
 
         # 2) Initialize survivors and get the best individual
-        survivors_idxs = -1 * np.ones(len(combined_population), dtype=int)  # Initialize survivors
+        survivors_idxs = -1 * np.ones(self.population_size, dtype=int)  # Initialize survivors
         best_index = np.argmin(combined_fitness)  # Index of the best individual (minimum fitness)
         survivors_idxs[0] = best_index  # The first survivor is the best individual
-        #print(f"Survivors: {survivors_idxs}")
 
         counter = 1  # Start filling from index 1 since index 0 is already filled
         while np.any(survivors_idxs == -1):
-            #print(f"-------------Counter: {counter}----------------")
-            new_fitness = self.fitness_sharing_individual(population=combined_population, survivors=survivors_idxs, sigma=sigma, alpha=alpha)
+            print(f"Counter: {counter}")
+            # Compute fitness sharing for the remaining individuals
+            new_fitness = self.fitness_sharing_individual_np(population=combined_population, survivors=survivors_idxs, 
+                                                        population_fitness=combined_fitness, sigma=sigma, alpha=alpha)
 
             # Get the index of the next best individual
             best_index = np.argmin(new_fitness)
             survivors_idxs[counter] = best_index  # Add this individual to the survivors
             counter += 1
 
-
-
-
-        '''
-        combined_fitness, _, _ = self.fitness_function_calculation(population=combined_population, 
-                                                                weight_distance=self.weight_distance, 
-                                                                weight_bdp=self.weight_bdp, 
-                                                                distance_matrix=self.distance_matrix)
-        
-        _, hd_matrix = self.calculate_hamming_distance_population(combined_population)
-        
-        # 2) Initialize survivors and get the best individual
-        survivors_idxs = -1 * np.ones(len(combined_population), dtype=int)  # Initialize survivors
-        best_index = np.argmin(combined_fitness)  # Index of the best individual (minimum fitness)
-        survivors_idxs[0] = best_index  # The first survivor is the best individual
-
-        # 3) Loop to select the rest of the survivors based on fitness sharing
-        counter = 1  # Start filling from index 1 since index 0 is already filled
-
-        #print Shapes of the combined population and the hamming distance matrix
-        print(f"Combined population shape: {combined_population.shape}")
-        print(f"Hamming distance matrix shape: {hd_matrix.shape}")
-
-        while np.any(survivors_idxs == -1):  # While there are empty spots for survivors
-            # Get the current similarities of the new individual with the selected survivors
-            similarity = hd_matrix[:, survivors_idxs[survivors_idxs != -1]]
-            print(f"Similarity shape: {similarity.shape}")
-            
-            # Calculate the sharing function based on similarity
-            sharing_function = np.where(similarity < sigma, 1 - (similarity / sigma)**alpha, 0)
-            print(f"Sharing function shape: {sharing_function.shape}")
-            
-            # Apply fitness sharing to calculate adjusted fitness for each individual
-            adjusted_fitness = combined_fitness / np.sum(sharing_function, axis=1)
-            print(f"Adjusted fitness shape: {adjusted_fitness.shape}")
-
-            # Get the index of the next best individual
-            best_index = np.argmin(adjusted_fitness)  # The individual with the lowest adjusted fitness
-            survivors_idxs[counter] = best_index  # Add this individual to the survivors
-            counter += 1  # Increment the counter to fill the next spot
-            
-            # Mark the selected individual as "used" by setting its index to a very high value in fitness
-            combined_fitness[best_index] = np.inf  # Ensure it won't be selected again
-
-        '''
-
         # 4) Select the best individuals from the combined population
         self.population = combined_population[survivors_idxs]
         self.fitness = combined_fitness[survivors_idxs]
         self.distance_scores = self.calculate_distance_population(self.population)
         self.average_bpd_scores = self.average_bpd(self.population)
-        self.hamming_distance = self.calculate_hamming_distance_population(self.population)
+        self.hamming_distance,_ = self.calculate_hamming_distance_population(self.population)
         
-
-            
-
-
-
-        
-
-
-
-
 
     def eliminate_population(self, population, offsprings):
         """
@@ -1122,7 +1281,7 @@ class GA_K:
 
         
         # 2) Number of indivuals to keep
-        num_individual_keep = int((elitism_percentage/100)*combined_population.shape[0])
+        num_individual_keep = int((elitism_percentage/100)*self.population_size)
         if num_individual_keep <= 0:
             #raise ValueError(f"Elitism percentage ({elitism_percentage}%) is less than 0.")
             print(f" Num indivuals to keep is lower than zero, assigning 2 indivuals")
@@ -1140,7 +1299,7 @@ class GA_K:
         #print(f"Best individuals: {best_individuals}")
 
         # 3) Select the best individuals from the remaining population based on the k_tournament
-        num_individuals_rest = combined_population.shape[0] - num_individual_keep - self.population_size
+        num_individuals_rest = self.population_size - num_individual_keep
         if num_individuals_rest <= 0:
             raise ValueError(f"Elitism percentage ({elitism_percentage}%) is too high for the current population size ({self.population_size}).")
         
@@ -1149,8 +1308,11 @@ class GA_K:
         remaining_population_fitness = combined_fitness[remaining_indices]
         
         kPopulation, kfitness = self.selection_k_tournament_population(num_individuals=num_individuals_rest, population=remaining_population, 
-                                               fitness=remaining_population_fitness, k=self.k_tournament_k)
+                                               fitness=remaining_population_fitness, k=2)
        
+        #Make a print onm how many of the k.population are unique
+        unique_k_population = np.unique(kPopulation, axis=0)
+        print(f"Unique individuals in the k_population: {unique_k_population.shape[0]}")
 
         # 4) Combine the best individuals with the remaining population
         self.population = np.vstack((best_individuals, kPopulation))
@@ -1159,7 +1321,7 @@ class GA_K:
         self.average_bpd_scores = self.average_bpd(self.population)
         self.hamming_distance,_ = self.calculate_hamming_distance_population(self.population)
 
-        print(f"Self popualtion shape: {self.population.shape}")
+        #print(f"Self popualtion shape: {self.population.shape}")
 
         if self.population.shape[0] > self.population_size:
             raise ValueError(f"New population size ({self.population.shape[0]}) is greater than the maximum allowed size ({self.population_size}).")
@@ -1376,9 +1538,52 @@ class GA_K:
         avg_bpd = np.mean(bpd_matrix, axis=1)  # Calculate average BPD for each solution
         return avg_bpd
 
+    def fitness_sharing_individual_np(self, population, survivors, population_fitness, sigma, alpha):
+        '''
+        - Vectorized fitness sharing for TSP using `calculate_hamming_distance_individual`.
+        - Computes the fitness for each individual based on its pairwise Hamming distance to the survivors.
+        '''
+        # Number of individuals in the population
+        num_individuals = len(population)
+        
+        # Initialize the fitness sharing multipliers as 1
+        fitness_sharing = np.ones(num_individuals)
+        
+        # For each survivor, apply fitness sharing to all individuals
+        for survivor_idx in survivors:
+            if survivor_idx == -1:
+                break
+            
+            # Get the survivor
+            survivor = population[survivor_idx]
+            
+            # Compute pairwise Hamming distances for each individual to the current survivor
+            survivor_distances = np.array([self.calculate_hamming_distance_individual(ind, survivor) for ind in population])
+            #print(f"Survivor distances: {survivor_distances}")
+            
+            
+            
+            
+            # Apply the fitness sharing: if distance <= sigma, apply the sharing term (1 + alpha), else 1
+            sharing_term = np.where(survivor_distances <= sigma, (1-((survivor_distances)/sigma)**alpha), 1)
+            # Handle identical individuals (distance = 0) explicitly by applying the penalty
+            #sharing_term[survivor_distances == 0] = 1 - (1 / sigma) ** alpha  # Apply custom penalty for identical individuals
+            sharing_term[survivor_distances == 0] = 0.00000000000000000001  # Apply custom penalty for identical individuals
+            #print(f"Sharing term: {sharing_term}")
+            
+            # Multiply the fitness sharing terms with the current fitness sharing values
+            fitness_sharing *= 1/sharing_term
+        
+        # Compute the new fitness values by applying the sharing effect
+        #print(f"Fitness sharing: {fitness_sharing}")
+        #print(f"Population fitness: {population_fitness}")
+        fitness_new = population_fitness * fitness_sharing
+        #print(f"Fitness new: {fitness_new}")
+        
+        return fitness_new
 
-    def fitness_sharing_individual(self,population,survivors,sigma,alpha):
-        fitness_population = self.calculate_distance_population(population)
+    def fitness_sharing_individual(self,population,survivors,population_fitness,sigma,alpha):
+        fitness_population = population_fitness
         fitness_new = np.zeros_like(fitness_population)
         #print(f"Fitness_new: {fitness_new}")
         for idx,individual in enumerate(population):
@@ -1389,10 +1594,10 @@ class GA_K:
                     hamming_distance = self.calculate_hamming_distance_individual(individual,population[survivor])
                     #print(f"Hamming distance: {hamming_distance}")
                     if hamming_distance <= sigma:
-                        oneplusbeta += 1 - (hamming_distance/sigma)**alpha
+                        oneplusbeta += 100000
                     old_fitness = fitness_population[idx]
-                    fitness_new[idx] = old_fitness * oneplusbeta**np.sign(old_fitness)
-                    #print(f"Fitness new: {fitness_new[idx]} vs {fitness_population[idx]}")   
+                    fitness_new[idx] = old_fitness * oneplusbeta
+                    print(f"Fitness new: {fitness_new[idx]} vs {fitness_population[idx]}")   
                 
                     #print(f"Fitness is the same : {fitness_new[idx]} vs {fitness_population[idx]}")
         return fitness_new
@@ -1882,8 +2087,81 @@ def calculate_total_distance_individual(route, distance_matrix):
 
 
 
+@jit(nopython=True)
+def calculate_total_distance_individual_jit(route, distance_matrix):
+    '''
+    Calculate the total distance of a given route
+    '''
+    n = len(route)
+    total_distance = 0
+    for i in range(n - 1):
+        total_distance += distance_matrix[route[i], route[i + 1]]
+    total_distance += distance_matrix[route[-1], route[0]]  # Return to start
+    return total_distance
 
-    
+
+
+@jit(nopython=True)
+def two_opt_no_loops_optimized_jit(route, distance_matrix, max_iterations=10, k_neighbors=10, min_improvement_threshold=100):
+    '''
+    Optimized 2-opt with Numba for JIT compilation. Avoids unsupported advanced indexing.
+    '''
+    best_route = np.copy(route)
+    best_distance = calculate_total_distance_individual_jit(best_route, distance_matrix)
+    n = len(route)
+
+    improvement = True
+    iteration = 0
+
+    while improvement and iteration < max_iterations:
+        improvement = False
+
+        # Generate all pairs of indices i, j (i < j)
+        i_indices, j_indices = np.triu_indices(n, k=2)
+
+        # Prepare arrays to store distance changes and candidate swaps
+        delta_distances = np.empty(len(i_indices), dtype=np.float64)
+
+        # Calculate delta distances for all (i, j) pairs using scalar indexing
+        for idx in range(len(i_indices)):
+            i, j = i_indices[idx], j_indices[idx]
+            i_next = (i + 1) % n
+            j_next = (j + 1) % n
+
+            # Calculate old and new distances for this swap
+            old_dist = (
+                distance_matrix[best_route[i], best_route[i_next]] +
+                distance_matrix[best_route[j], best_route[j_next]]
+            )
+            new_dist = (
+                distance_matrix[best_route[i], best_route[j]] +
+                distance_matrix[best_route[i_next], best_route[j_next]]
+            )
+
+            delta_distances[idx] = new_dist - old_dist
+
+        # Find the top k_neighbors swaps with the largest improvements
+        top_k_indices = np.argsort(delta_distances)[:k_neighbors]
+
+        # Check if any swap provides an improvement
+        if np.any(delta_distances[top_k_indices] < 0):
+            improvement = True
+            best_swap_idx = top_k_indices[np.argmin(delta_distances[top_k_indices])]
+            i, j = i_indices[best_swap_idx], j_indices[best_swap_idx]
+
+            # Perform the 2-opt swap: reverse the segment between i and j
+            best_route[i + 1 : j + 1] = best_route[i + 1 : j + 1][::-1]
+            best_distance += delta_distances[best_swap_idx]
+
+        # Stop if no improvement or improvement is below the threshold
+        if not improvement or np.min(delta_distances[top_k_indices]) > min_improvement_threshold:
+            break
+
+        iteration += 1
+
+    return best_route
+
+
     
 
 
