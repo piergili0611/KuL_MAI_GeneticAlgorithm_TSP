@@ -12,7 +12,7 @@ class GA_K:
         self.k_tournament_k = 3
         self.population_size = 0.0
         #self.mutation_rate = mutation_prob
-        self.mutation_rate = 0.5
+        self.mutation_rate = 0.1
         self.elistism = 1                   #Elitism rate as a percentage
 
 
@@ -34,6 +34,13 @@ class GA_K:
 
         #Diversity: Hamming Distance
         self.hamming_distance_list = []
+        self.hamming_distance_crossover_list = []
+        self.hamming_distance_crossoverOld_list = []
+        self.hamming_distance_mutation1_list = []
+        self.hamming_distance_mutation2_list = []
+        self.hamming_distance_elimination_list = []
+        self.hamming_distance_local_search_list = []
+        
         
 
         self.weight_distance = 1
@@ -87,13 +94,14 @@ class GA_K:
         print(f"       - Population Size: {self.population_size}")
         print(f"       - Number of cities: {self.gen_size}")
         print(f"       - Cities: {self.cities}")
-        #print(f"       - Distance Matrix: {self.distance_matrix}")
+        print(f"       - Distance Matrix: {self.distance_matrix}")
         print(f"   * Model Parameters:")
         print(f"       - K: {self.k_tournament_k}")
         print(f"       - Mutation rate: {self.mutation_rate}")
         print(f"       - Elitism percentage: {self.elistism} %")
         print(f"   * Running model:")
         print(f"       - Local search: {self.local_search}")
+        print(f"       - Initial Fitness: {self.fitness}")
         
 
         
@@ -105,7 +113,12 @@ class GA_K:
         self.distance_matrix = self.check_inf(distance_matrix=distance_matrix,replace_value=1e8)
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
-        self.population_size = 50
+        if self.gen_size < 200:
+            self.population_size = 50
+        else:
+            self.population_size = 15
+
+        #self.population_size = 50
         self.k_tournament_k = 3
         #self.k_tournament_k = int((3/100)*self.population_size)
         #print(f"Distance matrix is {self.distance_matrix}")
@@ -201,10 +214,7 @@ class GA_K:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     def run_model(self):
-        time_start = time.time()
-        self.set_initialization()
-        time_end = time.time()
-        diff_time = time_end - time_start   
+        
         
         #self.set_initialization_onlyValid_numpy(fitness_threshold=1e5)
         yourConvergenceTestsHere = False
@@ -216,25 +226,39 @@ class GA_K:
             bestObjective = 0.0
             bestSolution = np.array([1,2,3,4,5])
             '''
+            if iterations == 0:
+                time_start = time.time()
+                self.set_initialization()
+                #self.set_initialization_onlyValid_numpy_incremental(fitness_threshold=1e6)
+                time_end = time.time()
+                initialization_time = time_end - time_start 
+                
             time_start_iteration = time.time()
             iterations += 1
             self.iteration = iterations
+            print(f"\n Iteration number {iterations}")
             
             time_start = time.time()
             parents = self.selection_k_tournament(num_individuals=self.population_size)
             time_end = time.time()
-            diff_time = time_end - time_start
+            selection_time = time_end - time_start
             
             time_start = time.time()  
-            offspring = self.crossover_singlepoint_population(parents)
+            #offspring = self.crossover_singlepoint_population(parents)
+            #offspring1 = self.crossover_order_population(parents)
+            offspring1 = self.crossover_order_population_hybrid(parents)    
+            #self.check_equality_twoPopulations(offspring,offspring1)
             time_end = time.time()
             time_crossover = time_end - time_start
+            self.calculate_add_hamming_distance(population=offspring1,crossover=True)
+            self.calculate_add_hamming_distance(population=offspring1,crossover_old=True)
             
 
             time_start = time.time()
-            offspring_mutated = self.mutation_singlepoint_population(offspring)
+            offspring_mutated = self.mutation_singlepoint_population(offspring1)
             time_end = time.time()
             time_mutation = time_end - time_start
+            self.calculate_add_hamming_distance(population=offspring_mutated,mutation1=True)
             
 
 
@@ -243,16 +267,22 @@ class GA_K:
             self.population = self.mutation_singlepoint_population(self.population)
             time_end = time.time()
             time_mutation_population = time_end - time_start
+            self.calculate_add_hamming_distance(population=self.population,mutation2=True)
           
 
             if self.local_search:
                 time_start = time.time()
-                offspring_mutated = np.vstack((offspring_mutated,self.population))
+                #offspring_mutated = np.vstack((offspring_mutated,self.population))
+                #only do this after each 15 iterations
+                
+
                 offspring_mutated= self.local_search_population(offspring_mutated,max_iterations=50)
                 time_end = time.time()
                 time_local_search = time_end - time_start
+                self.calculate_add_hamming_distance(population=offspring_mutated,local_search=True)
             else:
                 time_local_search = 0
+                self.calculate_add_hamming_distance(population=offspring_mutated,local_search=True)
                
             
             time_start = time.time()
@@ -270,7 +300,7 @@ class GA_K:
             yourConvergenceTestsHere = False
             time_end_iteration = time.time()
             diff_time_iteration = time_end_iteration - time_start_iteration
-            self.update_time(time_initalization=diff_time,time_selection=diff_time,time_crossover=time_crossover,time_mutation=time_mutation,time_elimination=time_elimination,time_mutation_population=time_mutation_population,time_local_search=time_local_search,time_iteration=diff_time_iteration)
+            self.update_time(time_initalization=initialization_time,time_selection=selection_time,time_crossover=time_crossover,time_mutation=time_mutation,time_elimination=time_elimination,time_mutation_population=time_mutation_population,time_local_search=time_local_search,time_iteration=diff_time_iteration)
 
 
         self.print_best_solution()
@@ -352,8 +382,135 @@ class GA_K:
         self.fitness = fitness
         self.print_model_info()
 
+    def set_initialization_onlyValid_numpy_incremental(self, fitness_threshold=1e8):
+        """
+        Initialize the population with valid individuals (fitness < fitness_threshold), using fast NumPy operations.
+        This version generates individuals incrementally, adding one city at a time while ensuring the fitness remains below the threshold.
+        
+        Parameters:
+        - fitness_threshold: float
+            Maximum allowed fitness for valid individuals. Higher fitness individuals are discarded.
+        """
 
-    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        population_size = self.population_size
+        gen_size = self.gen_size
+        distance_matrix = self.distance_matrix
+
+        # Pre-allocate population array and fitness list
+        population = np.empty((population_size, gen_size), dtype=np.int32)
+        fitness = np.empty(population_size, dtype=np.float64)
+
+        current_index = 0
+
+        while current_index < population_size:
+            # Initialize a new individual incrementally
+            print(f"\nPopulation progress: {current_index}")
+            route = np.full(gen_size, -1, dtype=np.int32)  # -1 indicates unassigned cities
+            visited = np.zeros(gen_size, dtype=bool)  # City visitation status
+            current_distance = 0.0
+
+            # Start with a random city
+            start_city = np.random.randint(gen_size)
+            route[0] = start_city
+            visited[start_city] = True
+
+            # Vectorized approach to add cities incrementally
+            for i in range(1, gen_size):
+                prev_city = route[i - 1]
+                
+                # Get the distances from the previous city to all unvisited cities
+                remaining_cities = np.where(~visited)[0]  # Indices of unvisited cities
+                remaining_distances = distance_matrix[prev_city, remaining_cities]
+
+                # Mask out cities that exceed the fitness threshold
+                valid_cities_mask = remaining_distances < fitness_threshold
+
+                if np.any(valid_cities_mask):
+                    # Get the valid cities and their corresponding distances
+                    valid_cities = remaining_cities[valid_cities_mask]
+                    valid_distances = remaining_distances[valid_cities_mask]
+
+                    # Select the city with the minimum distance
+                    best_city_idx = np.argmax(valid_distances)
+                    best_city = valid_cities[best_city_idx]
+
+                    # Assign the best city to the current position in the route
+                    route[i] = best_city
+                    current_distance += valid_distances[best_city_idx]
+                    visited[best_city] = True
+                else:
+                    # If no valid city is found, discard the individual
+                    break
+            else:
+                # If a valid individual is created (i.e., the loop didn't break)
+                population[current_index] = route
+                fitness[current_index] = current_distance
+                current_index += 1
+
+            # Optional status print (can be removed for better performance)
+            if current_index % 100 == 0:
+                print(f"Population progress: {current_index}/{population_size}")
+
+        # Ensure the population has the correct size and each solution has gen_size cities
+        assert population.shape[0] == self.population_size, f"Population size mismatch: {population.shape[0]} != {self.population_size}"
+        assert population.shape[1] == self.gen_size, f"Each solution should have {self.gen_size} cities, but has {population.shape[1]} cities."
+
+        # Final population setup
+        self.population = population
+        self.fitness = fitness
+
+        # Update internal distance matrix (replace any inf values with the specified value)
+        self.distance_matrix = self.check_inf(self.distance_matrix, replace_value=1e8)
+        
+        # Recalculate the fitness for the entire population
+        self.fitness = self.calculate_distance_population(self.population)
+        
+        # Print final status
+        print(f"\nInitial Population shape: {self.population.shape}")
+        print(f"\nInitial population: {self.population}")
+        self.check_population(self.population)
+        self.print_model_info()
+
+    def check_population(self, population):
+        """
+        Check the validity of the population. This includes:
+        - Ensuring each individual has exactly `self.gen_size` cities.
+        - Ensuring each individual has no duplicate cities.
+        - Ensuring that every individual contains all the cities exactly once, i.e., the solution is a permutation of the cities.
+
+        Parameters:
+        - population: numpy array of shape (population_size, gen_size), representing the population.
+
+        Raises:
+        - ValueError: if any of the checks fail.
+        """
+
+        # Check 1: Ensure each individual has exactly `self.gen_size` cities
+        if population.shape[1] != self.gen_size:
+            raise ValueError(f"Each solution must have exactly {self.gen_size} cities, but found {population.shape[1]}.")
+
+        # Check 2: Ensure no duplicate cities within each individual
+        for i in range(population.shape[0]):
+            if len(np.unique(population[i])) != self.gen_size:
+                #print the individual with the duplicate cities and teh cities duplicates and the number of duplicates
+                print(f"Individual {i} contains duplicate cities. Each individual should have unique cities.")
+                print(f"Individual {i} is : {population[i]}")
+                #print(f"Unique cities: {np.unique(population[i])}")
+                print(f"Number of duplicates: {self.gen_size - len(np.unique(population[i]))}")
+                raise ValueError(f"Individual {i} contains duplicate cities. Each individual should have unique cities.")
+
+        # Check 3: Ensure every individual contains all cities exactly once
+        all_cities_set = set(self.cities)  # This will be the set of all cities.
+        for i in range(population.shape[0]):
+            individual_set = set(population[i])  # Convert individual to set to check uniqueness
+            if individual_set != all_cities_set:
+                #raise ValueError(f"Individual {i} does not contain all the cities. Found cities: {individual_set}. Expected cities: {all_cities_set}.")
+                print("Individual {i} does not contain all the cities. Found cities: {individual_set}. Expected cities: {all_cities_set}.")
+
+        print("Population is valid.")
+
+     
+    #----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 2) Selection ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     
@@ -410,10 +567,97 @@ class GA_K:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 4) Crossover & Mutation ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def crossover_order_population_hybrid(self,population):
+        num_parents, num_cities = population.shape
+        
+        # Generate crossover points
+        crossover_indices = np.random.randint(0, num_cities, size=(num_parents, 2))
+        crossover_indices.sort(axis=1)  # Ensure crossover_index1 <= crossover_index2
 
-    
+        # Parent pairing (circular shift)
+        parent1 = population
+        parent2 = np.roll(population, shift=-1, axis=0)
 
+        # Initialize children with -1 (unfilled)
+        children_population = -1 * np.ones_like(population)
+
+        # Step 1: Copy the crossover segments from parent1 to children
+        for i in range(num_parents):
+            start, end = crossover_indices[i]
+            children_population[i, start:end] = parent1[i, start:end]
+
+        # Step 2: Randomize the filling of the remaining cities
+        for i in range(num_parents):
+            start, end = crossover_indices[i]
+            copied_cities = parent1[i, start:end]
+
+            # Mask to identify cities in parent2 that are not in the copied segment
+            mask = ~np.isin(parent2[i], copied_cities)
+
+            # Extract the remaining cities in parent2
+            remaining_cities = parent2[i, mask]
+
+            # Shuffle the remaining cities to encourage diversity
+            np.random.shuffle(remaining_cities)
+
+            # Find unfilled positions in the child
+            unfilled_indices = np.where(children_population[i] == -1)[0]
+
+            # Place shuffled remaining cities into the unfilled indices
+            children_population[i, unfilled_indices] = remaining_cities
+
+        return children_population
     
+    def crossover_order_population(self, population):
+        """
+        Perform Order Crossover (OX) for a population of TSP tours using NumPy.
+
+        Parameters:
+        - population: numpy array of shape (num_parents, num_cities),
+                    where each row is a TSP tour.
+
+        Returns:
+        - children_population: numpy array of shape (num_parents, num_cities),
+                                containing the offspring population.
+        """
+        num_parents, num_cities = population.shape
+
+        # Step 1: Generate two random crossover points for all parents
+        crossover_indices = np.random.randint(0, num_cities, size=(num_parents, 2))
+        crossover_indices.sort(axis=1)  # Ensure crossover_index1 <= crossover_index2
+
+        # Step 2: Pair parents (parent1 pairs with parent2, which is the next parent in population)
+        parent1 = population
+        parent2 = np.roll(population, shift=-1, axis=0)  # Circular shift for parent pairing
+
+        # Step 3: Initialize children with -1 (unfilled)
+        children_population = -1 * np.ones_like(population)
+
+        # Step 4: Copy crossover segments from parent1 to children
+        for i in range(num_parents):
+            start, end = crossover_indices[i]
+            children_population[i, start:end] = parent1[i, start:end]
+
+        # Step 5: Fill the remaining slots in each child from parent2
+        for i in range(num_parents):
+            # Extract the already filled segment
+            start, end = crossover_indices[i]
+            copied_cities = parent1[i, start:end]
+
+            # Create a mask for cities in parent2 not in the copied segment
+            mask = ~np.isin(parent2[i], copied_cities)
+
+            # Extract the remaining cities in parent2
+            remaining_cities = parent2[i, mask]
+
+            # Find indices in the child that are unfilled (-1)
+            unfilled_indices = np.where(children_population[i] == -1)[0]
+
+            # Place the remaining cities into the unfilled indices
+            children_population[i, unfilled_indices] = remaining_cities
+
+        return children_population
+        
     
     def crossover_singlepoint_population(self, population):
         # Number of parents in the population
@@ -568,49 +812,130 @@ class GA_K:
 
 
    
-    # 2-opt local search function
-    def two_opt(self,route, distance_matrix, max_iterations=10):
+    def calculate_total_distance_individual(self,route, distance_matrix):
+        '''
+        Calculate the total distance of a given route
+        '''
+        current_indices = route[:-1]
+        next_indices = route[1:]
+        distances = distance_matrix[current_indices, next_indices]
+        total_distance = np.sum(distances) + distance_matrix[route[-1], route[0]]  # Return to start
+        return total_distance
+
+    def two_opt_no_loops_opt(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
+        '''
+        Optimized 2-opt with reduced neighborhood search: focuses on the most promising swaps
+        '''
         best_route = np.copy(route)
-        best_distance = calculate_total_distance_individual(best_route, distance_matrix)
+        best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
+        n = len(route)
         
-        for iter in range(max_iterations):
-            improved = False
-            for i in range(len(route) - 1):
-                for j in range(i + 1, len(route)):
-                    # Reverse the section between i and j
-                    new_route = np.copy(route)
-                    new_route[i:j+1] = np.flip(new_route[i:j+1])
-                    #print(f"New route: {new_route} vs best route: {best_route}")
-                    
-                    # Calculate new distance after applying the 2-opt swap
-                    new_distance = calculate_total_distance_individual(new_route, distance_matrix)
-                    #print(f"New distance: {new_distance} vs best distance: {best_distance}")
-                    # Accept the new route if it's better
-                    if new_distance < best_distance:
-                        best_route = np.copy(new_route)
-                        old_distance = best_distance
-                        best_distance = new_distance
-                        improved = True
-                        #print(f"Improved distance: From {old_distance} to {best_distance} in iteration {iter}")
+        improvement = True
+        iteration = 0
+        
+        while improvement and iteration < max_iterations:
+            improvement = False
             
-            # If no improvement, stop early
-            if not improved:
+            # Generate all pairs of indices i, j (i < j)
+            i_indices, j_indices = np.triu_indices(n, k=2)
+            
+            # Calculate the distance changes for all (i, j) pairs in parallel
+            i_next = (i_indices + 1) % n
+            j_next = (j_indices + 1) % n
+            
+            old_distances = (
+                distance_matrix[best_route[i_indices], best_route[i_next]] +
+                distance_matrix[best_route[j_indices], best_route[j_next]]
+            )
+            
+            new_distances = (
+                distance_matrix[best_route[i_indices], best_route[j_indices]] +
+                distance_matrix[best_route[i_next], best_route[j_next]]
+            )
+            
+            delta_distances = new_distances - old_distances
+            
+            # Identify the top k pairs with the largest improvement (most negative delta_distances)
+            top_k_indices = np.argsort(delta_distances)[:k_neighbors]
+            
+            # If there are any improving swaps in the top k, apply the best one
+            if np.any(delta_distances[top_k_indices] < 0):
+                improvement = True
+                best_swap_index = top_k_indices[np.argmin(delta_distances[top_k_indices])]
+                i, j = i_indices[best_swap_index], j_indices[best_swap_index]
+                
+                # Perform the 2-opt swap: reverse the segment between i and j
+                best_route[i + 1 : j + 1] = best_route[i + 1 : j + 1][::-1]
+                best_distance += delta_distances[best_swap_index]
+            
+            # Stop if no improvement or improvement is very small
+            if not improvement or np.min(delta_distances[top_k_indices]) > min_improvement_threshold:
                 break
+            
+            iteration += 1
 
         return best_route
 
-    # Local search function that applies 2-opt to the top 5 individuals
-    def local_search_population(self,population, max_iterations=100):
-        # Step 1: Evaluate the fitness of all individuals in the population
+    def two_opt_no_loops(self,route, distance_matrix, max_iterations=10):
+        '''
+        Loop-reduced 2-opt implementation using vectorized operations
+        '''
+        best_route = np.copy(route)
+        best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
+        n = len(route)
+
+        for iter in range(max_iterations):
+            # Generate all pairs of indices i, j (i < j)
+            i_indices, j_indices = np.triu_indices(n, k=2)
+
+            # Calculate the distance changes for all (i, j) pairs in parallel
+            # Original edges: (i -> i+1) and (j -> j+1)
+            i_next = (i_indices + 1) % n
+            j_next = (j_indices + 1) % n
+
+            old_distances = (
+                distance_matrix[best_route[i_indices], best_route[i_next]]
+                + distance_matrix[best_route[j_indices], best_route[j_next]]
+            )
+            new_distances = (
+                distance_matrix[best_route[i_indices], best_route[j_indices]]
+                + distance_matrix[best_route[i_next], best_route[j_next]]
+            )
+            delta_distances = new_distances - old_distances
+
+            # Find the swaps that improve the distance
+            improving_swaps = delta_distances < 0
+
+            if not np.any(improving_swaps):
+                break  # Stop if no improvement
+
+            # Apply the first improvement (or modify this to apply all improvements)
+            best_swap_index = np.argmax(improving_swaps)
+            i, j = i_indices[best_swap_index], j_indices[best_swap_index]
+
+            # Perform the 2-opt swap: reverse the segment between i and j
+            best_route[i + 1 : j + 1] = best_route[i + 1 : j + 1][::-1]
+            best_distance += delta_distances[best_swap_index]
+
+        return best_route
+    
+    def local_search_population(self, population, max_iterations=10):
+        '''
+        Optimized local search for the population: applies 2-opt to the top individuals
+        '''
         distance_matrix = self.distance_matrix
+        
+        # Step 1: Evaluate fitness for all individuals in the population
         distances = self.calculate_distance_population(population)
         
-        # Step 2: Select the top 5 best individuals based on the distance (lower is better)
-        best_indices = np.argsort(distances)[:2]
+        # Step 2: Select the top `n_best` individuals
+        n_best = 2  # Or set to the desired number of top individuals
+        best_indices = np.argsort(distances)[:n_best]
         
-        # Step 3: Apply 2-opt to the top 5 best individuals
+        # Step 3: Apply 2-opt to the selected top individuals
         for i in best_indices:
-            population[i] = self.two_opt(population[i], distance_matrix, max_iterations)
+            population[i] = self.two_opt_no_loops_opt(population[i], distance_matrix, max_iterations,k_neighbors=10)
+            #population[i] = self.two_opt_no_loops(population[i], distance_matrix, max_iterations)
         
         return population
 
@@ -834,6 +1159,8 @@ class GA_K:
         self.average_bpd_scores = self.average_bpd(self.population)
         self.hamming_distance,_ = self.calculate_hamming_distance_population(self.population)
 
+        print(f"Self popualtion shape: {self.population.shape}")
+
         if self.population.shape[0] > self.population_size:
             raise ValueError(f"New population size ({self.population.shape[0]}) is greater than the maximum allowed size ({self.population_size}).")
 
@@ -938,9 +1265,36 @@ class GA_K:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 6) Fitness Calculation ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def calculate_add_hamming_distance(self,population,crossover=False,crossover_old= False,mutation1=False,mutation2=False,local_search=False,elimination=False): 
+        '''
+        - Calculate the fitness of the population
+        '''
+        hamming_distance,_ = self.calculate_hamming_distance_population(population)
+        if crossover:
+            self.hamming_distance_crossover_list.append(hamming_distance)
+        elif mutation1:
+            self.hamming_distance_mutation1_list.append(hamming_distance)
+        elif mutation2:
+            self.hamming_distance_mutation2_list.append(hamming_distance)
+        elif local_search:
+            self.hamming_distance_local_search_list.append(hamming_distance)
+        elif elimination:
+            self.hamming_distance_elimination_list.append(hamming_distance)
+        elif crossover_old:
+            self.hamming_distance_crossoverOld_list.append(hamming_distance)   
+        
 
+    def check_equality_twoPopulations(self,population1,population2):
+        '''
+        - Check the equality between two populations
+        '''
+        equal = np.array_equal(population1,population2)
+        #print(f"\n Equality between two populations: {equal}, with population 1: {population1} and population 2: {population2}")
 
-   
+        hamm_distance1,_ = self.calculate_hamming_distance_population(population1)
+        hamm_distance2,_ = self.calculate_hamming_distance_population(population2)
+        print(f"\n Hamming distance between two populations:  Population 1 (Old): {hamm_distance1} vs Population 2 (New):{hamm_distance2}")
+        return 
 
     def calculate_distance_population(self,population):
         '''
@@ -1258,47 +1612,7 @@ class GA_K:
         # Show the second plot
         fig_fitness.show()
 
-         # Create the first plot for Best and Mean Objective values
-        fig_obj = go.Figure()
-
-        # Add the best objective trace
-        fig_obj.add_trace(go.Scatter(
-            x=list(range(len(self.best_average_bdp_scores_list))),
-            y=self.best_average_bdp_scores_list,
-            mode='lines+markers',
-            name='Best BPD',
-            line=dict(color='blue'),
-            marker=dict(symbol='circle')
-        ))
-
-        # Add the mean objective trace
-        fig_obj.add_trace(go.Scatter(
-            x=list(range(len(self.mean_average_bdp_scores_list))),
-            y=self.mean_average_bdp_scores_list,
-            mode='lines+markers',
-            name='Mean BPD',
-            line=dict(color='orange'),
-            marker=dict(symbol='x')
-        ))
-
-     
-
-
-        # Set the title and axis labels for the objective plot
-        fig_obj.update_layout(
-            title=f'Objective Distance over Iterations with mutation rate {self.mutation_rate*100} %',
-            xaxis_title='Iterations',
-            yaxis_title='BPD (Diversity)',
-            legend=dict(x=0, y=1),
-            hovermode='x',
-            yaxis=dict(
-                type='log',  # Set Y-axis to logarithmic scale
-                autorange=True  # Ensure the axis is adjusted automatically
-            )
-        )
-
-        # Show the first plot
-        fig_obj.show()
+        
 
 
 
@@ -1356,6 +1670,61 @@ class GA_K:
             marker=dict(symbol='circle')
         ))
 
+        #Make me more traces for each self.hammind_distance_list
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Scatter
+        (
+            x=list(range(len(self.hamming_distance_crossover_list))),
+            y=self.hamming_distance_crossover_list,
+            mode='lines+markers',
+            name='Hamming distance crossover',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_obj.add_trace(go.Scatter
+        (
+            x=list(range(len(self.hamming_distance_mutation1_list))),
+            y=self.hamming_distance_mutation1_list,
+            mode='lines+markers',
+            name='Hamming distance mutation1',
+            line=dict(color='green'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_obj.add_trace(go.Scatter
+        (
+            x=list(range(len(self.hamming_distance_mutation2_list))),
+            y=self.hamming_distance_mutation2_list,
+            mode='lines+markers',
+            name='Hamming distance mutation2',
+            line=dict(color='red'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_obj.add_trace(go.Scatter
+        (
+            x=list(range(len(self.hamming_distance_local_search_list))),
+            y=self.hamming_distance_local_search_list,
+            mode='lines+markers',
+            name='Hamming distance local search',
+            line=dict(color='purple'),
+            marker=dict(symbol='x')
+        ))
+
+    
+
+        fig_obj.add_trace(go.Scatter
+        (   
+            x=list(range(len(self.hamming_distance_crossoverOld_list))),
+            y=self.hamming_distance_crossoverOld_list,
+            mode='lines+markers',
+            name='Hamming distance crossoverOld',
+            line=dict(color='pink'),
+            marker=dict(symbol='x')
+        ))  
+
+       
        
 
        

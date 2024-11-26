@@ -71,7 +71,7 @@ class algorithm:
         if model:
             num_cities = int(model.num_cities)
             if num_clusters is None:
-                num_clusters = math.ceil(num_cities/30)
+                num_clusters = math.ceil(num_cities/20)
             if min_cluster_size is None:
                 min_cluster_size = int(num_cities/60)
             #model.run_model( k=num_clusters, min_cluster_size=min_cluster_size) 
