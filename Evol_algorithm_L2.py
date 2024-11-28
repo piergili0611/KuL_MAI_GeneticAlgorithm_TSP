@@ -30,6 +30,10 @@ class GA_K_L2:
       
         self.cities_model = cities_model
 
+        # Fitness Sharing
+        self.sigma = 0.9
+        self.alpha = 0.1
+
         #Unique Solutions
         self.num_unique_solutions_list = []
         self.num_repeated_solutions_list = []
@@ -107,12 +111,12 @@ class GA_K_L2:
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
         if self.gen_size > 200:
-            self.population_size = 50
+            self.population_size = 15
         else:
             self.population_size = 15
         
         
-        self.k_tournament_k = int((3/100)*self.population_size)
+        self.k_tournament_k = 3
         print(f"Distance matrix is {self.distance_matrix}")
         #print(f"Gen size is {self.gen_size}")
         print(f"Population size is {self.population_size}")
@@ -136,6 +140,10 @@ class GA_K_L2:
         best_index = np.argmin(self.fitness)
         best_solution = self.population_cluster[best_index]
         self.best_solution_cities = self.population_cities[best_index]
+
+        #Diversity: Hamming Distance
+        self.hamming_distance_list.append(self.hamming_distance)
+
         #Unique and repeated solutions
         self.caclulate_numberRepeatedSolution(population=self.population_cities)
         self.num_unique_solutions_list.append(self.num_unique_solutions)
@@ -205,7 +213,7 @@ class GA_K_L2:
         time_end = time.time()
         intialization_time = time_end - time_start 
         yourConvergenceTestsHere = False
-        num_iterations = 300
+        num_iterations = 200*10
         iterations = 0
         while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
             '''
@@ -213,6 +221,7 @@ class GA_K_L2:
             bestObjective = 0.0
             bestSolution = np.array([1,2,3,4,5])
             '''
+            # 1) Selection
             time_start_iteration = time.time()
             iterations += 1
             print(f"\n Iteration number {iterations}")
@@ -221,34 +230,46 @@ class GA_K_L2:
             time_end = time.time()
             time_selection = time_end - time_start
 
+            # 2) Crossover
             time_start = time.time()
             offspring_all_list = self.crossover_singlepoint_population(parents_all_list)
             time_end = time.time()
             time_crossover = time_end - time_start
-        
+            self.calculate_add_hamming_distance(population=offspring_all_list[0],crossover_old=True)
+            self.calculate_add_hamming_distance(population=offspring_all_list[0],crossover=True)
+
+            # 3) Mutation Offspring
             time_start = time.time()
             mutated_all_list = self.mutation_singlepoint_population(offspring_all_list)
             time_end = time.time()
             time_mutation = time_end - time_start
+            self.calculate_add_hamming_distance(population=mutated_all_list[0],mutation1=True)
             
+            # 4) Mutation Population
             time_start = time.time()
-            self.population_all_list = self.mutation_singlepoint_population(self.population_all_list)    
+            #self.population_all_list = self.mutation_singlepoint_population(self.population_all_list)    
             time_end = time.time()
             time_mutation_population = time_end - time_start
+            self.calculate_add_hamming_distance(population=self.population_all_list[0],mutation2=True)
 
+            # 5) Local Search
             if self.local_search:
                 time_start = time.time()
-                if iterations % 2 == 0: 
-                    mutated_all_list = self.combine_all_lists(all_list1=self.population_all_list,all_list2=mutated_all_list)
-                    #mutated_all_list = self.local_search_population(population_all_list=mutated_all_list)
+                
+                #mutated_all_list = self.combine_all_lists(all_list1=self.population_all_list,all_list2=mutated_all_list)
+                mutated_all_list = self.local_search_population(population_all_list=mutated_all_list,max_iterations=5)
                 time_end = time.time()
                 time_local_search = time_end - time_start
             else:
                 time_local_search = 0
+            self.calculate_add_hamming_distance(population=mutated_all_list[0],local_search=True)
 
+            # 6) Elimination
             time_start = time.time()
-            self.eliminate_population(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list)
+            #self.eliminate_population(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list)
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
+            self.eliminate_population_fs_tournament(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list, 
+                                                    sigma=self.sigma, alpha=self.alpha, k=self.k_tournament_k)
             time_end = time.time()
             time_elimination = time_end - time_start
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
@@ -743,6 +764,72 @@ class GA_K_L2:
         self.population_cities = unique_population_cities[best_indices]  
         self.population_all_list = [self.population_cluster,self.population_startEnd,self.population_cities] 
         self.fitness = unique_fitness_scores[best_indices]
+        self.hamming_distance, _ = self.calculate_hamming_distance_population(self.population_cities)
+
+
+    def eliminate_population_fs_tournament(self, population_all_list, mutated_all_list, sigma, alpha, k):
+        """
+        Eliminates population using k-tournament selection with fitness sharing.
+        
+        Parameters:
+        - population_all_list: list of numpy arrays [population_cluster, population_startEnd, population_cities]
+        - mutated_all_list: list of numpy arrays [mutated_population_cluster, mutated_population_startEnd, mutated_population_cities]
+        - sigma: float, sharing parameter for fitness sharing
+        - alpha: float, exponent parameter for fitness sharing
+        - k: int, size of tournament for selection
+        
+        Returns:
+        - Updated population lists with best individuals.
+        """
+        # Combine populations across all representations
+        population_cluster, population_startEnd, population_cities = population_all_list
+        mutated_cluster, mutated_startEnd, mutated_cities = mutated_all_list
+
+        combined_cluster = np.vstack((population_cluster, mutated_cluster))
+        combined_startEnd = np.vstack((population_startEnd, mutated_startEnd))
+        combined_cities = np.vstack((population_cities, mutated_cities))
+
+        # Calculate fitness for the combined cities population
+        fitness_scores = self.calculate_fitness(combined_cities)
+
+        # Initialize survivors' indices array
+        survivors_idxs = -1 * np.ones(self.population_size, dtype=int)
+
+        # Select the best individual directly
+        best_index = np.argmin(fitness_scores)
+        survivors_idxs[0] = best_index
+
+        # Exclude best individual from valid candidates
+        valid_candidates = np.setdiff1d(np.arange(len(fitness_scores)), [best_index])
+
+        # Perform k-tournament selection for the remaining survivors
+        for i in range(1, self.population_size):
+            new_fitness = self.fitness_sharing_individual_np(
+                population=combined_cities, 
+                survivors=survivors_idxs[:i],  
+                population_fitness=fitness_scores, 
+                sigma=sigma, 
+                alpha=alpha
+            )
+
+            if len(valid_candidates) > 0:
+                tournament_candidates = np.random.choice(valid_candidates, size=min(k, len(valid_candidates)), replace=False)
+           
+            else:
+                raise ValueError("No valid candidates remain for selection.")
+            
+            best_in_tournament = tournament_candidates[np.argmin(new_fitness[tournament_candidates])]
+            survivors_idxs[i] = best_in_tournament
+            valid_candidates = valid_candidates[valid_candidates != best_in_tournament]
+
+        # Select the final population based on the survivors' indices
+        self.population_cluster = combined_cluster[survivors_idxs]
+        self.population_startEnd = combined_startEnd[survivors_idxs]
+        self.population_cities = combined_cities[survivors_idxs]
+
+        self.population_all_list = [self.population_cluster, self.population_startEnd, self.population_cities]
+        self.fitness = fitness_scores[survivors_idxs]
+        self.hamming_distance, _ = self.calculate_hamming_distance_population(self.population_cities)
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 6) Merging Paths ------------------------------------------------------------------------------------------------
@@ -1066,7 +1153,49 @@ class GA_K_L2:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 7) Fitness Calculation ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
+    def fitness_sharing_individual_np(self, population, survivors, population_fitness, sigma, alpha):
+        '''
+        - Vectorized fitness sharing for TSP using `calculate_hamming_distance_individual`.
+        - Computes the fitness for each individual based on its pairwise Hamming distance to the survivors.
+        '''
+        # Number of individuals in the population
+        num_individuals = len(population)
+        
+        # Initialize the fitness sharing multipliers as 1
+        fitness_sharing = np.ones(num_individuals)
+        
+        # For each survivor, apply fitness sharing to all individuals
+        for survivor_idx in survivors:
+            if survivor_idx == -1:
+                break
+            
+            # Get the survivor
+            survivor = population[survivor_idx]
+            
+            # Compute pairwise Hamming distances for each individual to the current survivor
+            survivor_distances = np.array([self.calculate_hamming_distance_individual(ind, survivor) for ind in population])
+            #print(f"Survivor distances: {survivor_distances}")
+            
+            
+            
+            
+            # Apply the fitness sharing: if distance <= sigma, apply the sharing term (1 + alpha), else 1
+            sharing_term = np.where(survivor_distances <= sigma, (1-((survivor_distances)/sigma)**alpha), 1)
+            # Handle identical individuals (distance = 0) explicitly by applying the penalty
+            #sharing_term[survivor_distances == 0] = 1 - (1 / sigma) ** alpha  # Apply custom penalty for identical individuals
+            sharing_term[survivor_distances == 0] = 0.00000000000000000001  # Apply custom penalty for identical individuals
+            #print(f"Sharing term: {sharing_term}")
+            
+            # Multiply the fitness sharing terms with the current fitness sharing values
+            fitness_sharing *= 1/sharing_term
+        
+        # Compute the new fitness values by applying the sharing effect
+        #print(f"Fitness sharing: {fitness_sharing}")
+        #print(f"Population fitness: {population_fitness}")
+        fitness_new = population_fitness * fitness_sharing
+        #print(f"Fitness new: {fitness_new}")
+        
+        return fitness_new
 
     def calculate_fitness(self,population):
         '''
@@ -1103,7 +1232,71 @@ class GA_K_L2:
         
         return fitness
 
+    def calculate_hamming_distance_population(self,population):
+        # Number of cities (positions) in each solution
+        num_cities = population.shape[1]
+        
+        # Compute pairwise Hamming distances
+        # diff_matrix[i, j, k] -> True if city `k` in solution `i` differs from city `k` in solution `j`, else False
+        diff_matrix = population[:, None, :] != population[None, :, :]
+        
+        # Sum the differences across city positions
+        hamming_distances = np.sum(diff_matrix, axis=2)
+        
+        # Normalize the Hamming distance: divide each distance by the number of cities
+        normalized_hamming_distances = hamming_distances / num_cities
 
+        #print(f"Normalized Hamming distances: {normalized_hamming_distances}")
+        #print(f"Normalized Hamming distances shape: {normalized_hamming_distances.shape}")
+
+        # Calculate the mean of the normalized Hamming distances for each solution
+        row_means = np.mean(normalized_hamming_distances, axis=1)
+        #print(f"Row means: {row_means}")
+        #print(f"Row means shape: {row_means.shape}")
+        
+        # Finally, compute the average of these row means
+        avg_diversity = np.mean(row_means)
+        #print(f"Average diversity: {avg_diversity}")
+        return avg_diversity, hamming_distances
+    
+    def calculate_hamming_distance_individual(self,individual1,individual2):
+        '''
+        - Calculate the Hamming distance between two individuals
+        '''
+        #print(f"Individual 1: {individual1}")
+        #print(f"Individual 2: {individual2}")
+        # Number of cities (positions) in each solution
+        num_cities = len(individual1)
+        
+        # Compute pairwise Hamming distances
+        # diff_matrix[i, j] -> True if city `i` in solution `individual1` differs from city `i` in solution `individual2`, else False
+        diff_matrix = individual1 != individual2
+        
+        # Sum the differences across city positions
+        hamming_distance = np.sum(diff_matrix)/num_cities
+        #print(f"Hamming distance: {hamming_distance}")
+        
+        
+        
+        return hamming_distance
+
+    def calculate_add_hamming_distance(self,population,crossover=False,crossover_old= False,mutation1=False,mutation2=False,local_search=False,elimination=False): 
+        '''
+        - Calculate the fitness of the population
+        '''
+        hamming_distance,_ = self.calculate_hamming_distance_population(population)
+        if crossover:
+            self.hamming_distance_crossover_list.append(hamming_distance)
+        elif mutation1:
+            self.hamming_distance_mutation1_list.append(hamming_distance)
+        elif mutation2:
+            self.hamming_distance_mutation2_list.append(hamming_distance)
+        elif local_search:
+            self.hamming_distance_local_search_list.append(hamming_distance)
+        elif elimination:
+            self.hamming_distance_elimination_list.append(hamming_distance)
+        elif crossover_old:
+            self.hamming_distance_crossoverOld_list.append(hamming_distance) 
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 8) Plotting------------------------------------------------------------------------------------------------
@@ -1111,35 +1304,91 @@ class GA_K_L2:
 
     
     def plot_fitness_dynamic(self):
-        # Create a plotly figure
-        fig = go.Figure()
+        # Create the first plot for Best and Mean Objective values
+        fig_obj = go.Figure()
 
-        # Add the best fitness trace
-        fig.add_trace(go.Scatter(
+        # Add the best objective trace
+        fig_obj.add_trace(go.Scatter(
             x=list(range(len(self.best_fitness_list))),
             y=self.best_fitness_list,
             mode='lines+markers',
-            name='Best Distance',
+            name='Best Objective',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(self.mean_fitness_list))),
+            y=self.mean_fitness_list,
+            mode='lines+markers',
+            name='Mean Objective',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        # Get the last iteration's best and mean objective values
+        last_best_objective = self.best_fitness_list[-1]
+        last_mean_objective = self.mean_fitness_list[-1]
+
+        # Add text annotation for the last iteration's objective values
+        fig_obj.add_annotation(
+            x=len(self.best_fitness_list) - 1,
+            y=last_best_objective,
+            text=f'Best: {last_best_objective}<br>Mean: {last_mean_objective}',
+            showarrow=True,
+            arrowhead=1,
+            ax=-10,
+            ay=-40,
+            bgcolor='white',
+            bordercolor='black'
+        )
+
+        # Set the title and axis labels for the objective plot
+        fig_obj.update_layout(
+            title=f'Objective Distance over Iterations with mutation rate {self.mutation_rate*100} %',
+            xaxis_title='Iterations',
+            yaxis_title='Objective Distance',
+            legend=dict(x=0, y=1),
+            hovermode='x',
+            yaxis=dict(
+                type='log',  # Set Y-axis to logarithmic scale
+                autorange=True  # Ensure the axis is adjusted automatically
+            )
+        )
+
+        # Show the first plot
+        fig_obj.show()
+
+        # Create the second plot for Best and Mean Fitness values
+        fig_fitness = go.Figure()
+
+        # Add the best fitness trace
+        fig_fitness.add_trace(go.Scatter(
+            x=list(range(len(self.best_fitness_list))),
+            y=self.best_fitness_list,
+            mode='lines+markers',
+            name='Best Fitness',
             line=dict(color='blue'),
             marker=dict(symbol='circle')
         ))
 
         # Add the mean fitness trace
-        fig.add_trace(go.Scatter(
+        fig_fitness.add_trace(go.Scatter(
             x=list(range(len(self.mean_fitness_list))),
             y=self.mean_fitness_list,
             mode='lines+markers',
-            name='Mean Distance',
+            name='Mean Fitness',
             line=dict(color='orange'),
             marker=dict(symbol='x')
         ))
 
-        # Get the last iteration's best and mean fitness
+        # Get the last iteration's best and mean fitness values
         last_best_fitness = self.best_fitness_list[-1]
         last_mean_fitness = self.mean_fitness_list[-1]
 
-        # Add text annotation for the last iteration's fitness
-        fig.add_annotation(
+        # Add text annotation for the last iteration's fitness values
+        fig_fitness.add_annotation(
             x=len(self.best_fitness_list) - 1,
             y=last_best_fitness,
             text=f'Best: {last_best_fitness}<br>Mean: {last_mean_fitness}',
@@ -1151,21 +1400,25 @@ class GA_K_L2:
             bordercolor='black'
         )
 
-        # Set the title and axis labels
-        fig.update_layout(
-            title=f'Distance over Iterations with mutation rate {self.mutation_rate*100} %',
+        # Set the title and axis labels for the fitness plot
+        fig_fitness.update_layout(
+            title=f'Fitness over Iterations with mutation rate {self.mutation_rate*100} %',
             xaxis_title='Iterations',
-            yaxis_title='Distance',
+            yaxis_title='Fitness',
             legend=dict(x=0, y=1),
             hovermode='x',
             yaxis=dict(
-            type='log',  # Set Y-axis to logarithmic scale
-            autorange=True  # Ensure the axis is adjusted automatically
+                type='log',  # Set Y-axis to logarithmic scale
+                autorange=True  # Ensure the axis is adjusted automatically
             )
         )
 
-        # Show the plot
-        fig.show()
+        # Show the second plot
+        fig_fitness.show()
+
+        
+
+
 
         #Plotting unique solutions
         # Create the first plot for Best and Mean Objective values
@@ -1205,6 +1458,92 @@ class GA_K_L2:
         # Show the first plot
         fig_obj.show()
 
+
+        #hamming distance:
+         #Plotting unique solutions
+        # Create the first plot for Best and Mean Objective values
+        fig_obj = go.Figure()
+
+        # Add the best objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(self.hamming_distance_list))),
+            y=self.hamming_distance_list,
+            mode='lines+markers',
+            name='Hamming distance',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        #Make me more traces for each self.hammind_distance_list
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Scatter
+        (
+            x=list(range(len(self.hamming_distance_crossover_list))),
+            y=self.hamming_distance_crossover_list,
+            mode='lines+markers',
+            name='Hamming distance crossover',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_obj.add_trace(go.Scatter
+        (
+            x=list(range(len(self.hamming_distance_mutation1_list))),
+            y=self.hamming_distance_mutation1_list,
+            mode='lines+markers',
+            name='Hamming distance mutation1',
+            line=dict(color='green'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_obj.add_trace(go.Scatter
+        (
+            x=list(range(len(self.hamming_distance_mutation2_list))),
+            y=self.hamming_distance_mutation2_list,
+            mode='lines+markers',
+            name='Hamming distance mutation2',
+            line=dict(color='red'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_obj.add_trace(go.Scatter
+        (
+            x=list(range(len(self.hamming_distance_local_search_list))),
+            y=self.hamming_distance_local_search_list,
+            mode='lines+markers',
+            name='Hamming distance local search',
+            line=dict(color='purple'),
+            marker=dict(symbol='x')
+        ))
+
+    
+
+        fig_obj.add_trace(go.Scatter
+        (   
+            x=list(range(len(self.hamming_distance_crossoverOld_list))),
+            y=self.hamming_distance_crossoverOld_list,
+            mode='lines+markers',
+            name='Hamming distance crossoverOld',
+            line=dict(color='pink'),
+            marker=dict(symbol='x')
+        ))  
+
+       
+       
+
+       
+        # Set the title and axis labels for the objective plot
+        fig_obj.update_layout(
+            title=f'Hamming distance over Iterations with mutation rate {self.mutation_rate*100} %',
+            xaxis_title='Iterations',
+            yaxis_title='Hamming distance',
+            legend=dict(x=0, y=1),
+            hovermode='x'
+            
+        )
+
+        # Show the first plot
+        fig_obj.show()
         
 
     def plot_timing_info(self):

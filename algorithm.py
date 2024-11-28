@@ -7,6 +7,7 @@ from Evol_algorithm_L2 import GA_K_L2
 from k_clusters import k_clusters
 from cities import cities
 from clusterdashboard import ClusterDashboard
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 
@@ -71,7 +72,7 @@ class algorithm:
         if model:
             num_cities = int(model.num_cities)
             if num_clusters is None:
-                num_clusters = math.ceil(num_cities/40)
+                num_clusters = math.ceil(num_cities/50)
             if min_cluster_size is None:
                 min_cluster_size = int(num_cities/60)
             #model.run_model( k=num_clusters, min_cluster_size=min_cluster_size) 
@@ -371,10 +372,6 @@ class algorithm:
         self.run_algorithm_yesGenData(clusters=clusters,local_search=local_search)
 
 
-
-        
-
-
     def run_algorithm_noGenerateDataSets(self,clusters=True,local_search=True):
         '''
         - Run the algorithm without generating data sets, --> KU Leuven DataSets
@@ -391,13 +388,76 @@ class algorithm:
         self.K_cluster_model_generate_distance_matrix_cluster()
 
         print(f"-- Running the algorithm: generatedDatsSets --")
+        #self.run_algorithm_noGenData_parallel(clusters=clusters,local_search=local_search)
         self.run_algorithm_noGenData(clusters=clusters,local_search=local_search)
 
 
 
+
+
+    def run_algorithm_noGenData_parallel(self, clusters=True, local_search=True):
+        '''
+        - Run the algorithm with parallelized GA_Level1
+        '''
+        final_fitness = 0
+        final_solution = None
+        futures = []
+
+        # Create an executor for parallel processing
+        with ProcessPoolExecutor() as executor:
+            for index, cities in enumerate(self.cities_cluster_list):
+                distance_matrix = self.distance_matrix_cluster_list[index]
+                # Submit each GA_Level1 task to the executor
+                futures.append(
+                    executor.submit(
+                        self.run_GA_Level1_task, 
+                        np.array(cities), 
+                        distance_matrix, 
+                        local_search
+                    )
+                )
+
+            # Collect results as they complete
+            for future in as_completed(futures):
+                best_solution, delta_time = future.result()
+                self.add_cluster_solution(best_solution)
+                self.deltatime_cluster_list.append(delta_time)
+                print(f"Time taken for GA level 1: {delta_time}")
+
+        self.plot_ExecutionTime_Clusters()
+
+        # 2) Create and run Higher level GA model
+        if clusters:
+            time_start_GA_level2 = time.time()
+            self.add_run_GA_level2_model(
+                distance_matrix=self.distance_matrix,
+                cluster_solutions_matrix=self.clusters_solution_list,
+                local_search=local_search
+            )
+            final_solution, final_fitness = self.GA_level2_model_retrieveBestSolution(fitness=True)
+            time_end_GA_level2 = time.time()
+            delta_time = time_end_GA_level2 - time_start_GA_level2
+            print(f"Time taken for GA level 2: {delta_time}")
+            print(f"Final solution: {final_solution} & Final fitness: {final_fitness}")
+            self.check_city_solution(final_solution)
+        else:
+            final_solution = best_solution  
+            print(f"Final solution: {final_solution}")
+            self.check_city_solution(final_solution)
+
+    def run_GA_Level1_task(self, cities, distance_matrix, local_search):
+        '''
+        Function to run GA_Level1 task. Returns the best solution and elapsed time.
+        '''
+        time_start = time.time()
+        self.add_run_GA_level1_model(cities=cities, distance_matrix=distance_matrix, local_search=local_search)
+        best_solution = self.GA_level1_model_retrieveBestSolution()
+        time_end = time.time()
+        delta_time = time_end - time_start
+        return best_solution, delta_time
     
 
-    #make me a function taht given a city solution will check what i sthe length (number of cities) and if each city is unique
+    
     def check_city_solution(self,city_solution):
         '''
         - Check the city solution
