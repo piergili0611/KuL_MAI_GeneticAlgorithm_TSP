@@ -108,27 +108,29 @@ class algorithm:
     #--------------------------------------------------------------------- 3) GA_Level1 ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.1,local_search=True):
+    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.1,local_search=True,initial_solution=None,max_iterations=50):
         '''
         - Add the GA model
         '''
-        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42,local_search=local_search)
+        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42,local_search=local_search,max_iterations=max_iterations)
         model.set_distance_matrix(distance_matrix)
+        if initial_solution is not None:
+            model.add_initialSolution(initial_solution=initial_solution)
         self.GA_level1_model = model
 
-    def run_GA_level1_model(self,cities):
+    def run_GA_level1_model(self,cities,plot=False):
         '''
         - Run the GA model
         '''
-        self.GA_level1_model.run_model()
+        self.GA_level1_model.run_model(plot=plot)
 
-    def add_run_GA_level1_model(self,distance_matrix,cities,local_search=True):
+    def add_run_GA_level1_model(self,distance_matrix,cities,local_search=True,initial_solution=None,max_iterations=50,plot = False):
         '''
         - Add and run the GA model
         '''
         
-        self.add_GA_level1_model(distance_matrix=distance_matrix,cities=cities,local_search=local_search)
-        self.run_GA_level1_model(cities)
+        self.add_GA_level1_model(distance_matrix=distance_matrix,cities=cities,local_search=local_search,initial_solution=initial_solution,max_iterations=max_iterations)
+        self.run_GA_level1_model(cities,plot=plot)
 
     def GA_level1_model_retrieveBestSolution(self):
         '''
@@ -165,7 +167,8 @@ class algorithm:
         '''
         - Retrieve the best solution
         '''
-        return self.GA_level2_model.best_solution_cities, self.GA_level2_model.best_objective
+        
+        return self.GA_level2_model.best_solution_cities, self.GA_level2_model.best_objective, self.GA_level2_model.clusters_solution_matrix
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 5) City Model ------------------------------------------------------------------------------------------------
@@ -314,7 +317,7 @@ class algorithm:
             time_start_GA_level1 = time.time()
 
             distance_matrix = self.distance_matrix_cluster_list[index]
-            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search)
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search,max_iterations=50,plot = True)
             best_solution = self.GA_level1_model_retrieveBestSolution()
             self.add_cluster_solution(best_solution)
 
@@ -402,6 +405,7 @@ class algorithm:
         final_fitness = 0
         final_solution = None
         futures = []
+        print(f"self.cities_cluster_list: {self.cities_cluster_list}")
 
         # Create an executor for parallel processing
         with ProcessPoolExecutor() as executor:
@@ -434,12 +438,14 @@ class algorithm:
                 cluster_solutions_matrix=self.clusters_solution_list,
                 local_search=local_search
             )
-            final_solution, final_fitness = self.GA_level2_model_retrieveBestSolution(fitness=True)
+            final_solution, final_fitness, cities = self.GA_level2_model_retrieveBestSolution(fitness=True)
             time_end_GA_level2 = time.time()
             delta_time = time_end_GA_level2 - time_start_GA_level2
             print(f"Time taken for GA level 2: {delta_time}")
             print(f"Final solution: {final_solution} & Final fitness: {final_fitness}")
             self.check_city_solution(final_solution)
+            self.add_run_GA_level1_model(cities=final_solution, distance_matrix=self.distance_matrix, 
+                                         local_search=local_search,initial_solution = final_solution,max_iterations = 50,plot = True)
         else:
             final_solution = best_solution  
             print(f"Final solution: {final_solution}")

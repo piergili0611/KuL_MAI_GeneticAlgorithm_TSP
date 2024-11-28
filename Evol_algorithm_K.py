@@ -6,17 +6,20 @@ import time
 from numba import jit,njit,prange
 from itertools import combinations
 from concurrent.futures import ThreadPoolExecutor
+import heapq
 
 class GA_K:
 
-    def __init__(self,cities,seed=None ,mutation_prob = 0.001,elitism_percentage = 20,local_search=True):
+    def __init__(self,cities,seed=None ,mutation_prob = 0.001,elitism_percentage = 20,local_search=True,max_iterations = 50):
         #model_key_parameters
         self.cities = cities 
         self.k_tournament_k = 3
         self.population_size = 0.0
         #self.mutation_rate = mutation_prob
         self.mutation_rate = 0.5
-        self.elistism = 1       
+        self.elistism = 1
+
+        self.max_iterations = max_iterations       
         
         # Fitness Sharing
         self.sigma = 0.9
@@ -67,7 +70,10 @@ class GA_K:
         self.time_mutation_population_list = []
         self.time_local_search_list = []
         self.time_iteration_list = []
-    
+
+
+        # Initial Solution
+        self.initial_solution = None
 
         #Random seed
         if seed is not None:
@@ -221,7 +227,7 @@ class GA_K:
     #--------------------------------------------------------------------- 0) Run ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def run_model(self):
+    def run_model(self,plot = False):
         time_start = time.time()
         #self.set_initialization()
         self.set_initialization_onlyValid_numpy_incremental(fitness_threshold=1e5)
@@ -230,7 +236,9 @@ class GA_K:
         
         #self.set_initialization_onlyValid_numpy(fitness_threshold=1e5)
         yourConvergenceTestsHere = False
-        num_iterations = 200
+       
+        #num_iterations = 200
+        num_iterations = self.max_iterations
         iterations = 0
         while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
             '''
@@ -272,20 +280,21 @@ class GA_K:
 
             #Mutate also population
             time_start = time.time()
-            self.population = self.mutation_singlepoint_population(self.population)
+            #self.population = self.mutation_singlepoint_population(self.population)
             time_end = time.time()
             time_mutation_population = time_end - time_start
             self.calculate_add_hamming_distance(population=self.population,mutation2=True)
-            
+            print(f"  Local search of teh population")
+            self.population = self.local_search_population_2opt_multip(self.population,n_best = 2,max_iterations=100)
 
             if self.local_search:
                 time_start = time.time()
                 #offspring_mutated = np.vstack((offspring_mutated,self.population))
                 
                 
-                offspring_mutated= self.local_search_population_2opt_multip(offspring_mutated,n_best = 3,max_iterations=100)
+                offspring_mutated= self.local_search_population_2opt_multip(offspring_mutated,n_best = 2,max_iterations=20)
                 
-                #offspring_mutated= self.local_search_population_2opt(offspring_mutated,max_iterations=50)
+                #offspring_mutated= self.local_search_population_2opt(offspring_mutated,n_best = 2,max_iterations=10)
                 #offspring_mutated= self.local_search_population_3opt(offspring_mutated,max_iterations=50)
                 #offspring_mutated= self.local_search_population_jit(offspring_mutated,max_iterations=50)
                 #offspring_mutated= self.local_search_population_2opt_cum(offspring_mutated,max_iterations=50)
@@ -303,8 +312,8 @@ class GA_K:
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
             #self.eliminate_population_kTournamenElitism(population=self.population, offsprings=offspring_mutated,elitism_percentage=self.elistism)
             #self.check_insert_individual(num_iterations=100,threshold_percentage = 20)
-            self.eliminate_population_fs(population=self.population, offsprings=offspring_mutated, sigma=self.sigma, alpha=self.alpha)
-            #self.eliminate_population_fs_tournament(population=self.population, offsprings=offspring_mutated, sigma=0.1, alpha=0.1, k=3)
+            #self.eliminate_population_fs(population=self.population, offsprings=offspring_mutated, sigma=self.sigma, alpha=self.alpha)
+            self.eliminate_population_fs_tournament(population=self.population, offsprings=offspring_mutated, sigma=0.1, alpha=0.1, k=3)
             time_end = time.time()
             time_elimination = time_end - time_start
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
@@ -315,10 +324,12 @@ class GA_K:
             diff_time_iteration = time_end_iteration - time_start_iteration
             self.update_time(time_initalization=initialization_time,time_selection=selection_time,time_crossover=time_crossover,time_mutation=time_mutation,time_elimination=time_elimination,time_mutation_population=time_mutation_population,time_local_search=time_local_search,time_iteration=diff_time_iteration)
 
-
-        #self.print_best_solution()
-        self.plot_fitness_dynamic()
-        self.plot_timing_info()
+        if plot is True:
+            self.plot_fitness_dynamic()
+            self.plot_timing_info()
+        self.print_best_solution()
+        #self.plot_fitness_dynamic()
+        #self.plot_timing_info()
         
         
         return 0
@@ -327,7 +338,13 @@ class GA_K:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 1) Initalization ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    
+    def add_initialSolution(self,initial_solution):
+        '''
+        - Add an initial solution to the population
+        '''
+        self.initial_solution = initial_solution
+        print(f"\n Initial solution is : {self.initial_solution}")  
+
     def set_initialization(self,num_individuals_to_add=None):
         '''
         - Initialize the population
@@ -411,10 +428,17 @@ class GA_K:
         distance_matrix = self.distance_matrix
 
         # Pre-allocate population array and fitness list
-        population = np.empty((population_size, gen_size), dtype=np.int32)
-        fitness = np.empty(population_size, dtype=np.float64)
+        population = -1*np.ones((population_size, gen_size), dtype=np.int32)
+        fitness = -1*np.ones(population_size, dtype=np.float64)
 
-        current_index = 0
+        if self.initial_solution is not None:
+            # Add the initial solution to the population
+            population[0] = self.initial_solution
+            fitness[0] = self.calculate_total_distance_individual(self.initial_solution,distance_matrix=distance_matrix)
+            print(f"\nInitial solution added to the population: {population} with fitness {fitness}")
+            current_index = 1
+        else:
+            current_index = 0
 
         while current_index < population_size:
             # Initialize a new individual incrementally
@@ -446,8 +470,8 @@ class GA_K:
 
                     # Select the city with the minimum distance
                     random_index = np.random.choice(len(valid_cities))
-                    best_city_idx = np.argmax(valid_distances)
-                    #best_city_idx = random_index
+                    #best_city_idx = np.argmax(valid_distances)
+                    best_city_idx = random_index
                     best_city = valid_cities[best_city_idx]
 
                     # Assign the best city to the current position in the route
@@ -459,6 +483,7 @@ class GA_K:
                     break
             else:
                 # If a valid individual is created (i.e., the loop didn't break)
+                print(f"CUrrent index is : {current_index}")
                 population[current_index] = route
                 fitness[current_index] = current_distance
                 current_index += 1
@@ -827,6 +852,8 @@ class GA_K:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     
     # Optimized Local Search Function
+
+    # 0) Numba: Jit compilation
     def local_search_population_jit(self, population, max_iterations=10, k_neighbors=10, min_improvement_threshold=100):
         '''
         Optimized local search for the population: applies 2-opt to the top individuals
@@ -855,73 +882,9 @@ class GA_K:
         return total_distance
 
     def two_opt_no_loops_opt(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
-        '''
-        Optimized 2-opt with reduced neighborhood search: focuses on the most promising swaps
-        '''
-    
+         #print(f"\n ------------LOCAL SEARCH------------")
         best_route = np.copy(route)
-        best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
-    
-        n = len(route)
-        
-        improvement = True
-        iteration = 0
-        
-        time_start_outer = time.time()
-        while improvement and iteration < max_iterations:
-            improvement = False
-            #print(f"\n Iteration number {iteration}")
-            
-            # Generate all pairs of indices i, j (i < j)
-            i_indices, j_indices = np.triu_indices(n, k=2)
-            
-            # Calculate the distance changes for all (i, j) pairs in parallel
-            i_next = (i_indices + 1) % n
-            j_next = (j_indices + 1) % n
-            
-           
-            old_distances = (
-                distance_matrix[best_route[i_indices], best_route[i_next]] +
-                distance_matrix[best_route[j_indices], best_route[j_next]]
-            )
-            
-            new_distances = (
-                distance_matrix[best_route[i_indices], best_route[j_indices]] +
-                distance_matrix[best_route[i_next], best_route[j_next]]
-            )
-         
-            delta_distances = new_distances - old_distances
-            
-            # Identify the top k pairs with the largest improvement (most negative delta_distances)
-            top_k_indices = np.argsort(delta_distances)[:k_neighbors]
-            
-            # If there are any improving swaps in the top k, apply the best one
-            
-            if np.any(delta_distances[top_k_indices] < 0):
-               
-                improvement = True
-                best_swap_index = top_k_indices[np.argmin(delta_distances[top_k_indices])]
-                i, j = i_indices[best_swap_index], j_indices[best_swap_index]
-                
-                # Perform the 2-opt swap: reverse the segment between i and j
-                best_route[i + 1 : j + 1] = best_route[i + 1 : j + 1][::-1]
-                best_distance += delta_distances[best_swap_index]
-                
-            
-            
-            # Stop if no improvement or improvement is very small
-            
-            
-            iteration += 1
-      
-        
-
-        return best_route
-
-    def two_opt_no_loops_opt_out(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
-        #print(f"\n ------------LOCAL SEARCH------------")
-        best_route = np.copy(route)
-        best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
+        #best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
         n = len(route)
         
         # Generate all pairs of indices i, j (i < j)
@@ -950,7 +913,206 @@ class GA_K:
             #print(f"\n Iteration number {iteration}")
             
             # Identify the top k pairs with the largest improvement (most negative delta_distances)
+            #time_start = time.time()
+            #top_k_indices = heapq.nsmallest(k_neighbors, range(len(delta_distances)), key=lambda x: delta_distances[x])
             top_k_indices = np.argsort(delta_distances)[:k_neighbors]
+            #time_end = time.time()
+            #time_sorting = time_end - time_start
+            #print(f"\n Time for sorting: {time_sorting}")
+            
+            if np.any(delta_distances[top_k_indices] < 0):
+                #print(f"\n There is an improvement")
+                #print(f"\n Iteration number {iteration}")
+                
+        
+               
+                improvement = True
+                best_swap_index = top_k_indices[np.argmin(delta_distances[top_k_indices])]
+                i, j = i_indices[best_swap_index], j_indices[best_swap_index]
+                
+                # Perform the 2-opt swap: reverse the segment between i and j
+                best_route[i + 1 : j + 1] = best_route[i + 1 : j + 1][::-1]
+                
+                # Update the distances for the swapped pairs
+                old_distances = (
+                    distance_matrix[best_route[i_indices], best_route[i_next]] +
+                    distance_matrix[best_route[j_indices], best_route[j_next]]
+                )
+                
+                new_distances = (
+                    distance_matrix[best_route[i_indices], best_route[j_indices]] +
+                    distance_matrix[best_route[i_next], best_route[j_next]]
+                )
+                
+                # Recalculate delta_distances after the swap
+                delta_distances = new_distances - old_distances
+             
+            
+            iteration += 1
+        print(f"\n    LS Iterations: {iteration}")
+        return best_route
+
+    # 1) Normal 2 opt: NEE
+    def compute_nearest_neighbors_vectorized(distance_matrix, k_neighbors=10):
+        """
+        Compute the k nearest neighbors for each city using vectorized operations.
+        """
+        n = distance_matrix.shape[0]
+        nearest_neighbors = np.argsort(distance_matrix, axis=1)[:, 1:k_neighbors + 1]
+        return nearest_neighbors
+
+   
+        
+    # 1) Normal 2 opt
+    def local_search_population_2opt(self, population,n_best=2, max_iterations=10):
+        '''
+        Optimized local search for the population: applies 2-opt to the top individuals
+        '''
+        distance_matrix = self.distance_matrix
+        
+        # Step 1: Evaluate fitness for all individuals in the population
+        distances = self.calculate_distance_population(population)
+        
+        # Step 2: Select the best individual explicitly
+        # Or set to the desired number of top individuals
+        best_indices = np.argsort(distances)[:n_best]
+
+   
+        # Step 3: Apply 2-opt to the selected top individuals
+        for i in best_indices:
+            #print(f"\n Individual {i}")
+            time_start = time.time()
+            #population[i] = self.two_opt_no_loops_opt_out(population[i], distance_matrix, max_iterations,k_neighbors=10)
+            population[i] = self.two_opt_better1_n(population[i], distance_matrix, max_iterations)
+          
+            time_end = time.time()
+            time_local_search_iteration = time_end - time_start
+            print(f"\n Time for the local search iteration: {time_local_search_iteration}")
+            
+        
+        return population
+    
+    def two_opt_no_loops_opt_out(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
+        #print(f"\n ------------LOCAL SEARCH------------")
+        best_route = np.copy(route)
+        initial_route = np.copy(route)
+        inital_fitness = self.calculate_total_distance_individual(best_route, distance_matrix)
+        routes = [] 
+        n = len(route)
+        
+        # Generate all pairs of indices i, j (i < j)
+        i_indices, j_indices = np.triu_indices(n, k=2)
+        
+        # Calculate the old and new distances for all (i, j) pairs
+        i_next = (i_indices + 1) % n
+        j_next = (j_indices + 1) % n
+        old_distances = (
+            distance_matrix[best_route[i_indices], best_route[i_next]] +
+            distance_matrix[best_route[j_indices], best_route[j_next]]
+        )
+        
+        new_distances = (
+            distance_matrix[best_route[i_indices], best_route[j_indices]] +
+            distance_matrix[best_route[i_next], best_route[j_next]]
+        )
+        
+        # Calculate delta_distances once
+        delta_distances = new_distances - old_distances
+        
+        improvement = True
+        iteration = 0
+        while improvement and iteration < max_iterations:
+            improvement = False
+            #print(f"\n LS: Iteration number {iteration}")
+            
+            
+            top_k_indices = np.argsort(delta_distances)[:k_neighbors]
+       
+            
+          
+            if np.any(delta_distances[top_k_indices] < 0):
+              
+                best_swap_index = top_k_indices[np.argmin(delta_distances[top_k_indices])]
+                i, j = i_indices[best_swap_index], j_indices[best_swap_index]
+                
+                # Perform the 2-opt swap: reverse the segment between i and j
+               
+                best_route[i + 1 : j + 1] = best_route[i + 1 : j + 1][::-1]
+                routes.append(best_route)
+
+                improvement = True
+                
+                # Update the distances for the swapped pairs
+                old_distances = (
+                    distance_matrix[best_route[i_indices], best_route[i_next]] +
+                    distance_matrix[best_route[j_indices], best_route[j_next]]
+                )
+                
+                new_distances = (
+                    distance_matrix[best_route[i_indices], best_route[j_indices]] +
+                    distance_matrix[best_route[i_next], best_route[j_next]]
+                )
+                
+                # Recalculate delta_distances after the swap
+                delta_distances = new_distances - old_distances
+             
+            
+            iteration += 1
+        if len(routes) > 0:
+            routes_np = np.array(routes)
+            final_fitness = self.calculate_distance_population(routes_np)
+            best_sol = routes_np[np.argmin(final_fitness)]
+            best_fit = final_fitness[np.argmin(final_fitness)]
+            print(f"\n Initial Fitness: {inital_fitness} - Final Fitness: {best_fit} ")
+
+            if inital_fitness > best_fit:
+                best_route = best_sol
+            else:
+                best_route = route
+        else:
+            best_route = route
+
+        print(f"\n    LS Iterations: {iteration}")   
+        return best_route
+    
+    def two_opt_better1(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
+        #print(f"\n ------------LOCAL SEARCH------------")
+        best_route = np.copy(route)
+        #best_distance = self.calculate_total_distance_individual(best_route, distance_matrix)
+        n = len(route)
+        
+        # Generate all pairs of indices i, j (i < j)
+        i_indices, j_indices = np.triu_indices(n, k=2)
+        
+        # Calculate the old and new distances for all (i, j) pairs
+        i_next = (i_indices + 1) % n
+        j_next = (j_indices + 1) % n
+        old_distances = (
+            distance_matrix[best_route[i_indices], best_route[i_next]] +
+            distance_matrix[best_route[j_indices], best_route[j_next]]
+        )
+        
+        new_distances = (
+            distance_matrix[best_route[i_indices], best_route[j_indices]] +
+            distance_matrix[best_route[i_next], best_route[j_next]]
+        )
+        
+        # Calculate delta_distances once
+        delta_distances = new_distances - old_distances
+        
+        improvement = True
+        iteration = 0
+        while improvement and iteration < max_iterations:
+            improvement = False
+            #print(f"\n Iteration number {iteration}")
+            
+            # Identify the top k pairs with the largest improvement (most negative delta_distances)
+            time_start = time.time()
+            top_k_indices = heapq.nsmallest(k_neighbors, range(len(delta_distances)), key=lambda x: delta_distances[x])
+            #top_k_indices = np.argsort(delta_distances)[:k_neighbors]
+            time_end = time.time()
+            time_sorting = time_end - time_start
+            print(f"\n Time for sorting: {time_sorting}")
             
             if np.any(delta_distances[top_k_indices] < 0):
                 #print(f"\n There is an improvement")
@@ -984,38 +1146,14 @@ class GA_K:
             
         return best_route
     
-
-
-    def local_search_population_2opt(self, population, max_iterations=10):
-        '''
-        Optimized local search for the population: applies 2-opt to the top individuals
-        '''
-        distance_matrix = self.distance_matrix
-        
-        # Step 1: Evaluate fitness for all individuals in the population
-        distances = self.calculate_distance_population(population)
-        
-        # Step 2: Select the best individual explicitly
-        n_best = 10  # Or set to the desired number of top individuals
-        best_indices = np.argsort(distances)[:n_best]
-
    
-        # Step 3: Apply 2-opt to the selected top individuals
-        for i in best_indices:
-            #print(f"\n Individual {i}")
-            population[i] = self.two_opt_no_loops_opt_out(population[i], distance_matrix, max_iterations,k_neighbors=10)
-            
-        
-        return population
+    
+        iteration += 1
+        print(f"\n    LS Iterations: {iteration}")
+        return best_route
     
 
-    def local_search_for_individual(self,population, i, distance_matrix, max_iterations=10):
- 
-        population[i] = self.two_opt_no_loops_opt(population[i], distance_matrix, max_iterations)
-
-        
-        return population[i]
-
+    # 2) MultiProcessors: threads
     def local_search_population_2opt_multip(self, population,n_best=5, max_iterations=10):
         '''
         Optimized local search for the population: applies 2-opt to the top individuals using threading.
@@ -1040,26 +1178,22 @@ class GA_K:
         return population
     
   
-        """
-        Precompute the difference in distances for all possible 2-opt swaps.
-        """
-        i_indices, j_indices = np.triu_indices(n, k=2)
-        i_next = (i_indices + 1) % n
-        j_next = (j_indices + 1) % n
+    def local_search_for_individual(self,population, i, distance_matrix, max_iterations=10):
+        #fitness_original = self.calculate_total_distance_individual(population[i], distance_matrix) 
+        #population[i] = self.two_opt_no_loops_opt(population[i], distance_matrix, max_iterations)
+        population[i] = self.two_opt_no_loops_opt_out(population[i], distance_matrix, max_iterations)
+        #population[i] = self.two_opt_better1_n(population[i], distance_matrix, max_iterations)
+        #fitness_after = self.calculate_total_distance_individual(population[i], distance_matrix)
+        #print(f"\n Fitness before: {fitness_original} - Fitness after: {fitness_after}")
 
-        old_distances = (
-            distance_matrix[i_indices, i_next]
-            + distance_matrix[j_indices, j_next]
-        )
-        return i_indices, j_indices, i_next, j_next, old_distances
+        
+        return population[i]
 
 
     
+    
 
-
-   
- 
-        
+    # 3) 3-opt   
     def three_opt_no_loops_opt(self, route, distance_matrix, max_iterations=10, min_improvement_threshold=100, k_neighbors=10):
         '''
         Optimized 3-opt with reduced neighborhood search: focuses on the most promising swaps
@@ -1165,51 +1299,10 @@ class GA_K:
 
 
    
-        """
-        Perform a 2-opt local search using forward and backward cumulative distances to find the best swap.
-        
-        Args:
-        - distance_matrix (np.array): The distance matrix (NxN), where distance_matrix[i][j] is the distance from city i to city j.
-        - sequence (list or np.array): The sequence of cities in the current tour.
-        
-        Returns:
-        - new_sequence (np.array): The sequence after the best 2-opt swap is applied.
-        - best_fitness (float): The fitness (path length) of the improved solution.
-        """
-        N = len(sequence)
-        
-        # Calculate forward and backward cumulatives
-        forward_cumulative, backward_cumulative = self.calculate_cumulatives_np(distance_matrix, sequence)
-        
-        # Calculate initial fitness (sum of all edges)
-        initial_fitness = np.sum(distance_matrix[sequence[:-1], sequence[1:]]) + distance_matrix[sequence[-1], sequence[0]]
-        
-        best_fitness = initial_fitness
-        best_sequence = sequence.copy()
 
-        # Try all possible 2-opt swaps
-        for first in range(1, N - 2):  # first swap city
-            for second in range(first + 2, N - 1):  # second swap city
-                # Calculate the fitness of the new solution after the 2-opt swap
-                first_bridge = distance_matrix[sequence[first-1], sequence[second]]
-                second_bridge = distance_matrix[sequence[first], sequence[second-1]]
-                
-                # Calculate the middle part (distance between cities between first and second)
-                middle_part = np.sum(distance_matrix[sequence[i], sequence[i+1]] for i in range(first, second-1))
-                
-                # Compute total fitness after the 2-opt swap
-                fitness = forward_cumulative[first-1] + middle_part + backward_cumulative[second] + first_bridge + second_bridge
-                
-                # If the fitness is better (smaller), update the best fitness and best sequence
-                if fitness < best_fitness:
-                    best_fitness = fitness
-                    
-                    # Properly reverse the segment between first and second:
-                    best_sequence = np.hstack([sequence[:first], sequence[second-1:first-1:-1], sequence[second:]])
 
-        # Ensure the cycle remains consistent by keeping the first city only in the distance calculations
-        # The sequence does not include the first city explicitly as the last city, but it's still accounted for
-        return best_sequence
+    # 4) Common Functions
+    
 
     def calculate_cumulatives_np(self,distance_matrix, sequence):
         """
@@ -1267,7 +1360,7 @@ class GA_K:
 
         # 3) Perform k-tournament selection for the remaining survivors
         for i in range(1, self.population_size):
-            print(f"Selecting survivor {i + 1}/{self.population_size}")
+            #print(f"Selecting survivor {i + 1}/{self.population_size}")
             
             # Compute fitness sharing for the remaining individuals
             new_fitness = self.fitness_sharing_individual_np(

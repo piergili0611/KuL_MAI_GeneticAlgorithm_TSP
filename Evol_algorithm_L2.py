@@ -88,7 +88,7 @@ class GA_K_L2:
         
         self.best_solution_cities = self.cities[best_solution]
 
-        #print(f"\n Best solution cities are : {self.best_solution_cities}")
+        print(f"\n Best solution cities are : {self.best_solution_cities}")
 
     def print_model_info(self):
         print("\n------------- GA_Level2: -------------")
@@ -97,6 +97,7 @@ class GA_K_L2:
         print(f"       - Number of cities: {self.gen_size}")
         print(f"       - Number of clusters: {self.num_clusters}")
         print(f"       - Cluster Soluitions: {self.clusters_solution_matrix}")
+        print(f"       - Distance Matrix: {self.distance_matrix}")
         print(f"   * Model Parameters:")
         print(f"       - K: {self.k_tournament_k}")
         print(f"       - Mutation rate: {self.mutation_rate}")
@@ -111,9 +112,9 @@ class GA_K_L2:
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
         if self.gen_size > 200:
-            self.population_size = 15
+            self.population_size = 100
         else:
-            self.population_size = 15
+            self.population_size = 100
         
         
         self.k_tournament_k = 3
@@ -213,7 +214,7 @@ class GA_K_L2:
         time_end = time.time()
         intialization_time = time_end - time_start 
         yourConvergenceTestsHere = False
-        num_iterations = 200*10
+        num_iterations = 50
         iterations = 0
         while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
             '''
@@ -247,7 +248,7 @@ class GA_K_L2:
             
             # 4) Mutation Population
             time_start = time.time()
-            #self.population_all_list = self.mutation_singlepoint_population(self.population_all_list)    
+            self.population_all_list = self.mutation_singlepoint_population(self.population_all_list)    
             time_end = time.time()
             time_mutation_population = time_end - time_start
             self.calculate_add_hamming_distance(population=self.population_all_list[0],mutation2=True)
@@ -266,10 +267,10 @@ class GA_K_L2:
 
             # 6) Elimination
             time_start = time.time()
-            #self.eliminate_population(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list)
+            self.eliminate_population(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list)
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
-            self.eliminate_population_fs_tournament(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list, 
-                                                    sigma=self.sigma, alpha=self.alpha, k=self.k_tournament_k)
+            #self.eliminate_population_fs_tournament(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list, 
+                                                    #sigma=self.sigma, alpha=self.alpha, k=self.k_tournament_k)
             time_end = time.time()
             time_elimination = time_end - time_start
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()

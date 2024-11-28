@@ -64,7 +64,7 @@ class k_clusters:
             }
 
             self.clusters_list.append(cluster_info_dict)
-        self.plot_post_processed_clusters()
+        #self.plot_post_processed_clusters()
 
     def plot_post_processed_clusters(self):
         """
