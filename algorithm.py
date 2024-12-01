@@ -317,7 +317,7 @@ class algorithm:
             time_start_GA_level1 = time.time()
 
             distance_matrix = self.distance_matrix_cluster_list[index]
-            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search,max_iterations=50,plot = True)
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search,max_iterations=25,plot = True)
             best_solution = self.GA_level1_model_retrieveBestSolution()
             self.add_cluster_solution(best_solution)
 
@@ -456,7 +456,7 @@ class algorithm:
         Function to run GA_Level1 task. Returns the best solution and elapsed time.
         '''
         time_start = time.time()
-        self.add_run_GA_level1_model(cities=cities, distance_matrix=distance_matrix, local_search=local_search)
+        self.add_run_GA_level1_model(cities=cities, distance_matrix=distance_matrix, local_search=local_search,plot=False,max_iterations=100)
         best_solution = self.GA_level1_model_retrieveBestSolution()
         time_end = time.time()
         delta_time = time_end - time_start
