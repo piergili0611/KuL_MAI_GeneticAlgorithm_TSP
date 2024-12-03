@@ -17,11 +17,18 @@ class r0818807:
 		self.filename = filename
 		file = open(filename)
 		distanceMatrix = np.loadtxt(file, delimiter=",")
+
+		#replace if there are any infinities in the distance matrix
+		distanceMatrix[distanceMatrix == np.inf] = 100000
 		file.close()
 		self.distanceMatrix = distanceMatrix
 
 	def load_algorithm(self,number_of_cities=None):
 		self.algorithm = algorithm(num_cities=number_of_cities)
+
+	def creatAndGet_distnace_matrix(self,filename):
+		self.load_distance_matrix(filename=filename)
+		return self.distanceMatrix
 		
 
 	def run_k_means_algorithm(self, filename):

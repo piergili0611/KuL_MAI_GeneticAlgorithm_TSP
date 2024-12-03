@@ -39,6 +39,7 @@ class GA_K_L2:
         self.num_repeated_solutions_list = []
 
         #Diversity: Hamming Distance
+        self.hamming_distance = 0
         self.hamming_distance_list = []
         self.hamming_distance_crossover_list = []
         self.hamming_distance_crossoverOld_list = []
@@ -112,9 +113,9 @@ class GA_K_L2:
         self.gen_size = len(distance_matrix)
         #self.population_size = 2*self.gen_size
         if self.gen_size > 200:
-            self.population_size = 100
+            self.population_size = 15
         else:
-            self.population_size = 100
+            self.population_size = 15
         
         
         self.k_tournament_k = 3
@@ -143,7 +144,8 @@ class GA_K_L2:
         self.best_solution_cities = self.population_cities[best_index]
 
         #Diversity: Hamming Distance
-        self.hamming_distance_list.append(self.hamming_distance)
+        if self.hamming_distance:
+            self.hamming_distance_list.append(self.hamming_distance)
 
         #Unique and repeated solutions
         self.caclulate_numberRepeatedSolution(population=self.population_cities)
@@ -211,10 +213,11 @@ class GA_K_L2:
         
         time_start = time.time()
         self.set_initialization()
+        self.calculate_information_iteration()
         time_end = time.time()
         intialization_time = time_end - time_start 
         yourConvergenceTestsHere = False
-        num_iterations = 50
+        num_iterations = 0
         iterations = 0
         while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
             '''
@@ -248,11 +251,11 @@ class GA_K_L2:
             
             # 4) Mutation Population
             time_start = time.time()
-            self.population_all_list = self.mutation_singlepoint_population(self.population_all_list)    
+            #self.population_all_list = self.mutation_singlepoint_population(self.population_all_list)    
             time_end = time.time()
             time_mutation_population = time_end - time_start
             self.calculate_add_hamming_distance(population=self.population_all_list[0],mutation2=True)
-            self.population_all_list= self.local_search_population(population_all_list=self.population_all_list,n_best=2,max_iterations=50)
+            #self.population_all_list= self.local_search_population(population_all_list=self.population_all_list,n_best=2,max_iterations=50)
 
             # 5) Local Search
             if self.local_search:
@@ -268,10 +271,10 @@ class GA_K_L2:
 
             # 6) Elimination
             time_start = time.time()
-            self.eliminate_population(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list)
+            #self.eliminate_population(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list)
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
-            #self.eliminate_population_fs_tournament(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list, 
-                                                    #sigma=self.sigma, alpha=self.alpha, k=self.k_tournament_k)
+            self.eliminate_population_fs_tournament(population_all_list=self.population_all_list, mutated_all_list=mutated_all_list, 
+                                                    sigma=self.sigma, alpha=self.alpha, k=self.k_tournament_k)
             time_end = time.time()
             time_elimination = time_end - time_start
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
@@ -280,8 +283,8 @@ class GA_K_L2:
             diff_time_iteration = time_end_iteration - time_start_iteration
             self.update_time(time_initalization=intialization_time,time_selection=time_selection,time_crossover=time_crossover,time_mutation=time_mutation,time_elimination=time_elimination,time_mutation_population=time_mutation_population,time_local_search=time_local_search,time_iteration=diff_time_iteration)
         self.print_best_solution()
-        self.plot_fitness_dynamic()
-        self.plot_timing_info()
+        #self.plot_fitness_dynamic()
+        #self.plot_timing_info()
         
         return 0
     
@@ -306,13 +309,13 @@ class GA_K_L2:
         #print(f"\nInitial Population: {self.population_cities}")
 
         # 4) Merge clusters using greedy approach
-        #self.population_merged = self.greedyMerge_populationClusters(self.population_cluster)
+        self.population_cities = self.greedyMerge_populationClusters(self.population_cluster)
         #print(f"\nMerged Population: {self.population_merged}")
     
         
         # 5) Calculate fitness for the merged population
         self.fitness = self.calculate_fitness(self.population_cities)
-        #print(f"\nInitial Fitness: {self.fitness}")
+        print(f"\nInitial Fitness: {self.fitness}")
     
         self.population_all_list = [self.population_cluster,self.population_startEnd,self.population_cities]
         #print(f"\n Initial Population All List: {self.population_all_list}")
@@ -320,7 +323,7 @@ class GA_K_L2:
         # 6) Print model info
         self.print_model_info()
 
-
+    
     #----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 2) Selection ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
