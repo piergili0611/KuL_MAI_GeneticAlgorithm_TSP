@@ -74,7 +74,8 @@ class algorithm:
             num_cities = int(model.num_cities)
             if num_clusters is None:
                 #num_clusters = math.ceil(num_cities/50)
-                available_cores = os.cpu_count()
+                #available_cores = os.cpu_count()
+                available_cores = 2
                 num_clusters = math.ceil(available_cores)
             if min_cluster_size is None:
                 min_cluster_size = int(num_cities/60)
@@ -127,7 +128,7 @@ class algorithm:
         '''
         self.GA_level1_model.run_model(plot=plot)
 
-    def add_run_GA_level1_model(self,distance_matrix,cities,local_search=True,initial_solution=None,max_iterations=50,plot = False):
+    def add_run_GA_level1_model(self,distance_matrix,cities,local_search=True,initial_solution=None,max_iterations=50,plot = True):
         '''
         - Add and run the GA model
         '''
@@ -320,7 +321,7 @@ class algorithm:
             time_start_GA_level1 = time.time()
 
             distance_matrix = self.distance_matrix_cluster_list[index]
-            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search,max_iterations=2000,plot = True)
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search,max_iterations=400,plot = True)
             best_solution = self.GA_level1_model_retrieveBestSolution()
             self.add_cluster_solution(best_solution)
 
@@ -394,8 +395,8 @@ class algorithm:
         self.K_cluster_model_generate_distance_matrix_cluster()
 
         print(f"-- Running the algorithm: generatedDatsSets --")
-        self.run_algorithm_noGenData_parallel(clusters=clusters,local_search=local_search)
-        #self.run_algorithm_noGenData(clusters=clusters,local_search=local_search)
+        #self.run_algorithm_noGenData_parallel(clusters=clusters,local_search=local_search)
+        self.run_algorithm_noGenData(clusters=clusters,local_search=local_search)
 
 
 
@@ -412,7 +413,8 @@ class algorithm:
 
         # Create an executor for parallel processing
         #Detect available CPU cores
-        available_cores = os.cpu_count()
+        #available_cores = os.cpu_count()
+        available_cores = 2
         max_workers = available_cores
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             for index, cities in enumerate(self.cities_cluster_list):
@@ -451,7 +453,7 @@ class algorithm:
             print(f"Final solution: {final_solution} & Final fitness: {final_fitness}")
             self.check_city_solution(final_solution)
             self.add_run_GA_level1_model(cities=final_solution, distance_matrix=self.distance_matrix, 
-                                        local_search=local_search,initial_solution = final_solution,max_iterations = 1000,plot = True)
+                                        local_search=local_search,initial_solution = final_solution,max_iterations = 500,plot = True)
         else:
             final_solution = best_solution  
             print(f"Final solution: {final_solution}")
@@ -462,7 +464,7 @@ class algorithm:
         Function to run GA_Level1 task. Returns the best solution and elapsed time.
         '''
         time_start = time.time()
-        self.add_run_GA_level1_model(cities=cities, distance_matrix=distance_matrix, local_search=local_search,plot=False,max_iterations=100)
+        self.add_run_GA_level1_model(cities=cities, distance_matrix=distance_matrix, local_search=local_search,plot=True,max_iterations=500)
         best_solution = self.GA_level1_model_retrieveBestSolution()
         time_end = time.time()
         delta_time = time_end - time_start
