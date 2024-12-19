@@ -1,15 +1,20 @@
 import numpy as np 
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import seaborn as sns
 import time 
 import math
-from Evol_algorithm_K import GA_K
+from Evol_algorithm_K import r0818807
 from Evol_algorithm_L2 import GA_K_L2
 from k_clusters import k_clusters
 from cities import cities
 from clusterdashboard import ClusterDashboard
 from concurrent.futures import ProcessPoolExecutor, as_completed
-import os
+import os,sys
+import pandas as pd 
 
+#CSV:
+import csv
 
 
 class algorithm:
@@ -30,6 +35,24 @@ class algorithm:
 
         #To check k_clusterl model
         self.cities_model = None
+
+        #GA level 1
+        self.sigma_value = None
+
+
+
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 0) Tests: ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    def test_algorithm(self,generateDataSets=True,clusters=True,local_search=True,number_iterations = 10):
+        '''
+        - Test the algorithm
+        '''
+        for i in range(number_iterations):
+            print(f"Test iteration: {i}")
+            self.run_algorithm_main(generateDataSets=generateDataSets,clusters=clusters,local_search=local_search)
+            self.reset_algorithm()
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 1) Distance Matrix ------------------------------------------------------------------------------------------------
@@ -112,11 +135,14 @@ class algorithm:
     #--------------------------------------------------------------------- 3) GA_Level1 ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    def add_GA_level1_model(self,distance_matrix,cities,mutation_prob=0.1,local_search=True,initial_solution=None,max_iterations=50):
+    def add_GA_level1_model(self,distance_matrix,cities,local_search=True,initial_solution=None,max_iterations=1500, mutation_rate=0.1):
         '''
         - Add the GA model
         '''
-        model = GA_K(cities=cities,mutation_prob=mutation_prob,seed=42,local_search=local_search,max_iterations=max_iterations)
+        if self.sigma_value is not None:
+            model = r0818807(cities=cities,mutation_rate=mutation_rate,seed=42,local_search=local_search,max_iterations=max_iterations,sigma_value= self.sigma_value)
+        else:
+             model = r0818807(cities=cities,mutation_rate=mutation_rate,seed=42,local_search=local_search,max_iterations=max_iterations)
         model.set_distance_matrix(distance_matrix)
         if initial_solution is not None:
             model.add_initialSolution(initial_solution=initial_solution)
@@ -128,12 +154,12 @@ class algorithm:
         '''
         self.GA_level1_model.run_model(plot=plot)
 
-    def add_run_GA_level1_model(self,distance_matrix,cities,local_search=True,initial_solution=None,max_iterations=50,plot = True):
+    def add_run_GA_level1_model(self,distance_matrix,cities,local_search=True,initial_solution=None,max_iterations=50,plot = True,mutation_rate=0.1):
         '''
         - Add and run the GA model
         '''
         
-        self.add_GA_level1_model(distance_matrix=distance_matrix,cities=cities,local_search=local_search,initial_solution=initial_solution,max_iterations=max_iterations)
+        self.add_GA_level1_model(distance_matrix=distance_matrix,cities=cities,local_search=local_search,initial_solution=initial_solution,max_iterations=max_iterations, mutation_rate=mutation_rate)
         self.run_GA_level1_model(cities,plot=plot)
 
     def GA_level1_model_retrieveBestSolution(self):
@@ -141,6 +167,12 @@ class algorithm:
         - Retrieve the best solution
         '''
         return self.GA_level1_model.best_solution_cities
+    
+    def GA_level1_model_retrieveBestSolutionAndFitness(self):
+        '''
+        - Retrieve the best solution
+        '''
+        return self.GA_level1_model.best_solution_cities,self.GA_level1_model.best_objective,self.GA_level1_model.mean_objective
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 4) GA_Level2 ------------------------------------------------------------------------------------------------
@@ -248,6 +280,7 @@ class algorithm:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     
     
+    
 
     def run_algorithm_main(self,generateDataSets = True,clusters=True,local_search=True):
         '''
@@ -321,7 +354,7 @@ class algorithm:
             time_start_GA_level1 = time.time()
 
             distance_matrix = self.distance_matrix_cluster_list[index]
-            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search,max_iterations=400,plot = True)
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search,max_iterations=1500,plot = True)
             best_solution = self.GA_level1_model_retrieveBestSolution()
             self.add_cluster_solution(best_solution)
 
@@ -504,11 +537,392 @@ class algorithm:
         print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}& Cities cluster list: {self.cities_cluster_list}")
         return distance_matrix
     
+
+    
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------- 6) Test Algorithm: Multiple runs ------------------------------------------------------------------------------------------------
+    #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    def run_test_algorithm(self,number_oftimes=10,test_mutation_rates=False):
+        '''
+        - Run the test algorithm
+        '''
+        #Variables
+        best_fitness_list = []
+        best_route_list = []
+        mean_fitness_list = []
+        mutation_rates_list = [0.1,0.5,0.8]
+        sigma_list = [0.1,0.5,0.8]
+        results_dict = {}
+
+
+        if test_mutation_rates:
+            
+            for mutation_rate in mutation_rates_list:
+                print(f"\n Mutation rate: {mutation_rate}")
+                
+                for sigma in sigma_list:    
+                    print(f"\n Sigma: {sigma}")
+                    self.sigma_value = sigma
+                    best_fitness_list = []
+                    best_route_list = []
+                    mean_fitness_list = []
+                    results_dict = {}
+
+                    self.save_info_csv(results_dict,append=False,filename=f"{mutation_rate}{sigma}.csv")
+
+                    for i in range(number_oftimes):
+                        print(f"\n Test iteration: {i}")
+                        best_route, best_fitness, mean_fitness = self.run_algorithm_main_test(generateDataSets=False,clusters=False,local_search=True,mutation_rate = mutation_rate)
+                        best_route_list.append(best_route)
+                        best_fitness_list.append(best_fitness)
+                        mean_fitness_list.append(mean_fitness)
+                        results_dict[i] = [best_fitness,mean_fitness]
+                    self.plot_test_lineplot(best_fitness_list=best_fitness_list,mean_fitness_list= mean_fitness_list)
+                    self.plot_test_histogram(best_fitness_list=best_fitness_list,mean_fitness_list=mean_fitness_list)
+                    #results_dict[f"Mutation rate: {mutation_rate} & Sigma: {sigma}"] = [best_route_list,best_fitness_list,mean_fitness_list]
+                    #print(f"Results dict: {results_dict}")
+                    self.save_info_csv(results_dict,append=True,filename=f"{mutation_rate}{sigma}.csv")
+        else:
+            self.save_info_csv(results_dict,append=False)
+            for i in range(number_oftimes):
+                print(f"\n Test iteration: {i}")
+                best_route, best_fitness, mean_fitness = self.run_algorithm_main_test(generateDataSets=False,clusters=False,local_search=True)
+                best_route_list.append(best_route)
+                best_fitness_list.append(best_fitness)
+                mean_fitness_list.append(mean_fitness)
+                results_dict[i] = [best_fitness,mean_fitness]
+            self.save_info_csv(results_dict,append=True)
+            #print(f"Results dict: {results_dict}")
+
+            self.plot_test_lineplot(best_fitness_list=best_fitness_list,mean_fitness_list= mean_fitness_list)
+            self.plot_test_histogram(best_fitness_list=best_fitness_list,mean_fitness_list=mean_fitness_list)
+
+
+
+
+    
+    def run_algorithm_main_test(self,generateDataSets = True,clusters=True,local_search=True, mutation_rate = 0.1):
+        '''
+        - Run the algorithm
+        '''
+        if generateDataSets:
+            best_route,best_fitness,mean_fitness = self.run_algorithm_yesGenerateDataSets(clusters=clusters,local_search=local_search)
+        else:
+            best_route, best_fitness, mean_fitness = self.run_algorithm_noGenerateDataSets_test(clusters=clusters,local_search=local_search,mutation_rate=mutation_rate)
+
+        return best_route,best_fitness, mean_fitness
+    
+    def run_algorithm_noGenerateDataSets_test(self,clusters=True,local_search=True,mutation_rate=0.1):
+        '''
+        - Run the algorithm without generating data sets, --> KU Leuven DataSets
+        '''
+        print(f"-- Running the algorithm: No generatedDatsSets --")
+
+
+        if clusters:
+            self.add_run_k_cluster_model()
+        else:
+            self.add_run_k_cluster_model(num_clusters=1)
+
+        
+        self.K_cluster_model_generate_distance_matrix_cluster()
+
+        print(f"-- Running the algorithm: generatedDatsSets --")
+        #self.run_algorithm_noGenData_parallel(clusters=clusters,local_search=local_search)
+        best_route,best_fitness, mean_fitness = self.run_algorithm_noGenData_test(clusters=clusters,local_search=local_search, mutation_rate = mutation_rate)
+
+        return best_route,best_fitness, mean_fitness
+    
+    def run_algorithm_noGenData_test(self,clusters=True,local_search=True, mutation_rate = 0.1):
+        '''
+        - Run the algorithm
+        '''
+        index = 0
+        final_fitness = 0
+        final_solution = None
+
+        for cities in self.cities_cluster_list:
+            # 1) Add the GA model and run it for each cluster of cities and measure the time taken
+            time_start_GA_level1 = time.time()
+
+            distance_matrix = self.distance_matrix_cluster_list[index]
+            self.add_run_GA_level1_model(cities=np.array(cities),distance_matrix=distance_matrix,local_search=local_search,max_iterations=1500,plot = False, mutation_rate=mutation_rate)
+            best_solution,best_fitness,mean_fitness = self.GA_level1_model_retrieveBestSolutionAndFitness()
+
+        return best_solution,best_fitness, mean_fitness
+
+       
+
+    
+    def save_info_csv(self, results_dict,append, filename = "results.csv"):
+        """
+        Save the results to a CSV file.
+
+        Parameters:
+            results_dict (dict): A dictionary where keys are iterations, and values are tuples (best_fitness, mean_fitness).
+            student_number (str): The student's identification number.
+        """
+        #filename = "results.csv"
+        
+        if append:
+            # Write results
+            with open(filename, mode="a", newline="") as outFile:
+                writer = csv.writer(outFile)
+                for key, value in results_dict.items():
+                    print(f"Key: {key} & Value: {value}")
+                    best_fitness, mean_fitness = value
+                    writer.writerow([key, best_fitness, mean_fitness])
+
+        else:
+            # Open the file in write mode and add headers
+            with open(filename, mode="w", newline="") as outFile:
+                writer = csv.writer(outFile)
+                
+                # Write student number and headers
+                writer.writerow([f"# Filename: {filename}"])
+                writer.writerow(["Iteration", "Best Fitness", "Mean Fitness"])
+            
+    def post_process_csv(self):
+        directory = "Results\Results_750_Hyperparameter"
+        legend_labels = ["Mutation Rate: 0.1 & Sigma: 0.1", "Mutation Rate: 0.1 & Sigma: 0.5", "Mutation Rate: 0.1 & Sigma: 0.8",
+                         "Mutation Rate: 0.5 & Sigma: 0.1", "Mutation Rate: 0.5 & Sigma: 0.5", "Mutation Rate: 0.5 & Sigma: 0.8",
+                         "Mutation Rate: 0.8 & Sigma: 0.1", "Mutation Rate: 0.8 & Sigma: 0.5", "Mutation Rate: 0.8 & Sigma: 0.8"]
+        combined_pd = self.combine_csv_files(directory)
+        self.plot_boxplot(combined_pd)
+        self.plot_custom_boxplot(combined_pd, x_col='Filename', y_col='Best Fitness', ylabel='Distance', legend_labels=legend_labels)
+
+
+    def combine_csv_files(self,directory):
+        """
+        Combine all CSV files in the specified directory into a single DataFrame.
+        Each file's data will include a column identifying the file it came from.
+
+        Args:
+            directory (str): Path to the directory containing the CSV files.
+
+        Returns:
+            pd.DataFrame: A combined DataFrame with an added 'Filename' column.
+        """
+        combined_df = pd.DataFrame()
+
+        for filename in os.listdir(directory):
+            if filename.endswith(".csv"):  # Process only CSV files
+                file_path = os.path.join(directory, filename)
+                df = pd.read_csv(file_path, skiprows=1)  # Skip the comment line
+                df['Filename'] = filename  # Add a column for the filename
+                combined_df = pd.concat([combined_df, df], ignore_index=True)
+        
+        return combined_df   
+    
+    def plot_boxplot(self,df):
+        """
+        Plot a box-and-whisker plot for the Best Fitness from each file.
+
+        Args:
+            df (pd.DataFrame): A DataFrame with data from multiple files.
+        """
+        # Group data by filename and extract 'Best Fitness'
+        grouped = df.groupby('Filename')['Best Fitness']
+
+        # Create a list of values for the boxplot
+        data_to_plot = [group for _, group in grouped]
+
+        # Create the boxplot
+        plt.figure(figsize=(10, 6))
+        plt.boxplot(data_to_plot, labels=grouped.groups.keys(), patch_artist=True)
+        plt.title("Box-and-Whisker Plot of Best Fitness")
+        plt.ylabel("Best Fitness")
+        plt.xlabel("Filename")
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_custom_boxplot(self, df, x_col='Filename', y_col='Best Fitness', ylabel='Distance', legend_labels=None):
+        """
+        Plot a customized box-and-whisker plot with legend labels replacing x-axis category names.
+
+        Args:
+            df (pd.DataFrame): A DataFrame with data from multiple files.
+            x_col (str): Column name for the x-axis categories.
+            y_col (str): Column name for the y-axis values.
+            ylabel (str): Label for the y-axis.
+            legend_labels (list): Custom labels for the x-axis categories.
+        """
+        import matplotlib.patches as mpatches
+
+        plt.figure(figsize=(18, 12))
+
+        # Create a boxplot using seaborn
+        sns.boxplot(
+            x=x_col, y=y_col, data=df, palette="pastel", width=0.6, showmeans=True, meanline=True,
+            meanprops={"linestyle": "--", "color": "red", "linewidth": 2},
+            whiskerprops={"linewidth": 1.5},
+            boxprops={"edgecolor": "black", "linewidth": 1.5},
+            medianprops={"color": "blue", "linewidth": 2},
+            capprops={"linewidth": 1.5},
+            flierprops={"marker": "o", "markersize": 5, "markerfacecolor": "green", "alpha": 0.7}
+        )
+
+        # Customizing the plot
+        plt.title("Hyperparameter search of 750 cities instance problem using Box-and-Whisker Plot", fontsize=16, weight='bold')
+        plt.ylabel(ylabel, fontsize=14)
+        plt.xlabel("Parameters", fontsize=14)
+
+        # Replace x-axis ticks with legend labels if provided
+        if legend_labels:
+            plt.xticks(ticks=range(len(legend_labels)), labels=legend_labels, rotation=45, fontsize=12)
+        else:
+            plt.xticks(rotation=45, fontsize=12)
+
+        plt.yticks(fontsize=12)
+        plt.tight_layout()
+
+        # Add legend for plot elements
+        handles = [
+            mpatches.Patch(color="black", label="Box: IQR (Q1 to Q3)"),
+            mpatches.Patch(color="blue", label="Median (blue line)"),
+            mpatches.Patch(color="red", label="Mean (--red dashed line)"),
+            mpatches.Patch(color="green", label="Outliers (green dots)"),
+            mpatches.Patch(color="none", edgecolor="black", label="Whiskers: Range of data within 1.5*IQR", linewidth=1.5)
+        ]
+
+        # Add optional legend for group-specific labels
+        '''
+        if legend_labels:
+            group_handles = [
+                mpatches.Patch(color=color, label=label)
+                for color, label in zip(sns.color_palette("pastel"), legend_labels)
+            ]
+            handles.extend(group_handles)
+        '''
+
+        # Position the legend outside the plot
+        plt.legend(
+            handles=handles,
+            loc='center left',  # Place it to the left-center of the axes
+            bbox_to_anchor=(1.02, 0.5),  # Outside the plot on the right
+            fontsize=12,
+            frameon=True
+        )
+        plt.show()
+        
+    
+
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 7) Extras: Execution Time, Plots ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    
+    def plot_test_lineplot(self,best_fitness_list,mean_fitness_list):
+        '''
+        - Plot the test line plot
+        '''
+        # Create the first plot for Best and Mean Objective values
+        fig_obj = go.Figure()
 
+        
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(best_fitness_list))),
+            y=best_fitness_list,
+            mode='lines+markers',
+            name='Best Objective',
+            line=dict(color='blue'),
+            marker=dict(symbol='x')
+        ))
+
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(mean_fitness_list))),
+            y=mean_fitness_list,
+            mode='lines+markers',
+            name='Mean Objective',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+
+
+        # Set the title and axis labels for the objective plot
+        fig_obj.update_layout(
+            title=f'Best and Mean fitness for multiple runs of the GA algorithm with number of cities: {self.num_city}',
+            xaxis_title='Outer Iterations',
+            yaxis_title='Fitness (Distance)',
+            legend=dict(x=0, y=1),
+            hovermode='x',
+            yaxis=dict(
+                type='linear',  # Set Y-axis to logarithmic scale
+                autorange=True  # Ensure the axis is adjusted automatically
+            )
+        )
+
+        # Show the first plot
+        fig_obj.show()
+
+    def plot_test_histogram(self,best_fitness_list, mean_fitness_list):
+        '''
+        - Plot the test histogram
+        '''
+        
+        # Create the first plot for Best and Mean Objective values
+        fig_obj = go.Figure()
+
+        
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Histogram(
+            x=best_fitness_list,
+            name='Best Objective',
+            marker=dict(color='blue'),
+            opacity=0.75
+        ))
+
+        # Set the title and axis labels for the objective plot
+        fig_obj.update_layout(
+            title=f'Best fitness for multiple runs of the GA algorithm with number of cities: {self.num_city}',
+            xaxis_title='Outer Iterations',
+            yaxis_title='Best fitness',
+            legend=dict(x=0, y=1),
+            hovermode='x',
+            yaxis=dict(
+                type='linear',  # Set Y-axis to logarithmic scale
+                autorange=True  # Ensure the axis is adjusted automatically
+            )
+        )
+
+        # Show the first plot
+        fig_obj.show()
+        
+        # ================================================================================================================
+        # ================================================================================================================
+        # ================================================================================================================
+        # ================================================================================================================
+
+        # Create the first plot for Best and Mean Objective values
+        fig_obj = go.Figure()
+
+        
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Histogram(
+            x=mean_fitness_list,
+            name='Mean Objective',
+            marker=dict(color='orange'),
+            opacity=0.75
+        ))
+
+        # Set the title and axis labels for the objective plot
+        fig_obj.update_layout(
+            title=f'Mean fitness for multiple runs of the GA algorithm with number of cities: {self.num_city}',
+            xaxis_title='Outer Iterations',
+            yaxis_title='Mean Fitness',
+            legend=dict(x=0, y=1),
+            hovermode='x',
+            yaxis=dict(
+                type='linear',  # Set Y-axis to logarithmic scale
+                autorange=True  # Ensure the axis is adjusted automatically
+            )
+        )
+
+        # Show the first plot
+        fig_obj.show()
 
     def plot_ExecutionTime_Clusters(self):
             '''

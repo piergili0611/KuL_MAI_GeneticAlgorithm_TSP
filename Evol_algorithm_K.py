@@ -1,4 +1,5 @@
 import numpy as np
+import Reporter
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import seaborn as sns
@@ -14,15 +15,18 @@ import os
 #logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
 
 
-class GA_K:
+class r0818807:
 
-    def __init__(self,cities,seed=None ,mutation_prob = 0.001,elitism_percentage = 20,local_search=True,max_iterations = 200):
+    def __init__(self,cities,seed=None ,mutation_rate = 0.1,elitism_percentage = 20,local_search=True,max_iterations = 200, sigma_value = 0.1):
+        #Reporter:
+        self.reporter = Reporter.Reporter(self.__class__.__name__)
+        
         #model_key_parameters
         self.cities = cities 
         self.k_tournament_k = 3
         self.population_size = 0.0
         #self.mutation_rate = mutation_prob
-        self.mutation_rate = 0.05
+        self.mutation_rate = mutation_rate   # Prev 0.8 or 0.5
         self.elistism = 1
 
         self.max_iterations = max_iterations     
@@ -32,8 +36,8 @@ class GA_K:
         self.stuck_flag = False  
         
         # Fitness Sharing
-        self.sigma = 0.3
-        self.alpha = 0.2
+        self.sigma = sigma_value   # Prev 0.9
+        self.alpha = 0.1   # Prev 0.1
 
 
         self.mean_objective = 0.0
@@ -61,6 +65,10 @@ class GA_K:
         self.hamming_distance_mutation2_list = []
         self.hamming_distance_elimination_list = []
         self.hamming_distance_local_search_list = []
+
+        # Diversity: Edges
+        self.edges_dict = {}
+       
         
         
 
@@ -133,15 +141,16 @@ class GA_K:
         print(f"   * Model Info:")
         print(f"       - Population Size: {self.population_size}")
         print(f"       - Number of cities: {self.gen_size}")
-        print(f"       - Cities: {self.cities}")
-        print(f"       - Distance Matrix: {self.distance_matrix}")
+        #print(f"       - Cities: {self.cities}")
+        #print(f"       - Distance Matrix: {self.distance_matrix}")
         print(f"   * Model Parameters:")
         print(f"       - K: {self.k_tournament_k}")
         print(f"       - Mutation rate: {self.mutation_rate}")
+        print(f"       - Sigma: {self.sigma}")
         print(f"       - Elitism percentage: {self.elistism} %")
         print(f"   * Running model:")
         print(f"       - Local search: {self.local_search}")
-        print(f"       - Initial Fitness: {self.fitness}")
+        #print(f"       - Initial Fitness: {self.fitness}")
         
 
         
@@ -330,18 +339,18 @@ class GA_K:
                 #self.max_iter_ls = 500
                 #self.n_best = 4
                 self.stuck_flag = True
-                print(f"\n Population is stuck")
+                #print(f"\n Population is stuck")
             else:
                 self.stuck_flag = False
                 self.prev_bestFit = new_bestFit
                 #self.n_best = 2
                 #self.max_iter_ls = self.initial_iter
     
-    def check_stoppingCriteria(self,limit_stuck = 2):
+    def check_stoppingCriteria(self,time_left,limit_stuck = 2):
         '''
         - Check the stopping criteria
         '''
-        if self.counter_stuck >= limit_stuck:
+        if time_left < 0:
             self.stopping_criteria = True
         else:
             self.stopping_criteria = False
@@ -357,27 +366,21 @@ class GA_K:
         time_end = time.time()
         initialization_time = time_end - time_start 
         
-        #self.set_initialization_onlyValid_numpy(fitness_threshold=1e5)
-        
-        if self.gen_size < 200:
-            self.initial_iter = 80
-            self.max_iter_ls = 300
-        
-        else:
-            self.initial_iter = 200
-            self.max_iter_ls = 100
-        
+       
+        self.initial_iter = 200
+        self.max_iter_ls = 200
+    
        
         #num_iterations = 200
         num_iterations = self.max_iterations
         iterations = 0
-        while( (self.stopping_criteria is False) and iterations < num_iterations):
+        while( (self.stopping_criteria is False)):
             
            
             time_start_iteration = time.time()
             iterations += 1
             self.iteration = iterations
-            print(f"\n Iteration number {iterations}")
+            #print(f"\n Iteration number {iterations}")
             
             time_start = time.time()
             parents = self.selection_k_tournament(num_individuals=self.population_size)
@@ -397,6 +400,7 @@ class GA_K:
 
             time_start = time.time()
             offspring_mutated = self.mutation_singlepoint_population(offspring1)
+            offspring_mutated = self.mutation_inversion_population(offspring_mutated)
             time_end = time.time()
             time_mutation = time_end - time_start
             self.calculate_add_hamming_distance(population=offspring_mutated,mutation1=True)
@@ -406,10 +410,11 @@ class GA_K:
             #Mutate also population
             time_start = time.time()
             self.population = self.mutation_singlepoint_population(self.population)
+            #self.population = self.mutation_inversion_population(self.population)
             time_end = time.time()
             time_mutation_population = time_end - time_start
             self.calculate_add_hamming_distance(population=self.population,mutation2=True)
-            print(f"\n  ----- Local search of teh population--")
+            
             
             #self.population = self.local_search_population_2opt_multip(self.population,n_best = 2,max_iterations=500)
             
@@ -420,8 +425,8 @@ class GA_K:
                 #offspring_mutated, self.population = self.local_search_population_jit(population=self.population,mutation_population=offspring_mutated,n_best = 3,max_iterations=200)
                 
                 if self.stuck_flag or iterations < 3:
-                    if self.counter_stuck > 4:
-                        self.population,offspring_mutated= self.local_search_population_2opt_multip(population=self.population,mutation_population=offspring_mutated,n_best = 1,
+                    if self.counter_stuck > 100 and iterations % 100 == 0:
+                        self.population,offspring_mutated= self.local_search_population_2opt_multip(population=self.population,mutation_population=offspring_mutated,n_best = 3,
                                                                                                 max_iterations=self.max_iter_ls,k_neighbors=30,heavy_ls=True,random=False)
                         #self.population, offspring_mutated = self.local_search_population_2opt_multip_parallel(population=self.population,mutation_population=offspring_mutated,n_best = 1,
                                                                                                                #max_iterations=self.max_iter_ls)
@@ -438,8 +443,8 @@ class GA_K:
                 
                 #self.population,offspring_mutated= self.local_search_population_2opt_multip(population=self.population,mutation_population=offspring_mutated,n_best = self.n_best,
                                                                                             #max_iterations=self.max_iter_ls)
-                self.population,offspring_mutated= self.local_search_population_greedy(population=self.population,mutation_population=offspring_mutated,n_best = 5,max_iterations=10)
-                self.population,offspring_mutated = self.local_search_population_jit(population=self.population,mutation_population=offspring_mutated,n_best = 3,max_iterations=200)
+                self.population,offspring_mutated= self.local_search_population_greedy(population=self.population,mutation_population=offspring_mutated,n_best = 15,max_iterations=5)
+                self.population,offspring_mutated = self.local_search_population_jit(population=self.population,mutation_population=offspring_mutated,n_best = 5,max_iterations=200)
         
                 #self.population,offspring_mutated= self.local_search_population_2opt_multip(population=self.population,mutation_population=offspring_mutated,n_best = self.n_best,
                                                                                             #max_iterations=self.max_iter_ls,random=self.stuck_flag)
@@ -467,21 +472,41 @@ class GA_K:
             #self.eliminate_population_elitism(population=self.population, offsprings=offspring_mutated)
             #self.eliminate_population_kTournamenElitism(population=self.population, offsprings=offspring_mutated,elitism_percentage=self.elistism)
             #self.check_insert_individual(num_iterations=100,threshold_percentage = 20)
-            self.eliminate_population_fs(population=self.population, offsprings=offspring_mutated, sigma=self.sigma, alpha=self.alpha)
-            #self.eliminate_population_fs_tournament(population=self.population, offsprings=offspring_mutated, sigma=0.9, alpha=0.1, k=3)
+            #self.eliminate_population_fs(population=self.population, offsprings=offspring_mutated, sigma=self.sigma, alpha=self.alpha)
+            self.eliminate_population_fs_tournament(population=self.population, offsprings=offspring_mutated, sigma=self.sigma, alpha=self.alpha, k=3)
+            #self.eliminate_population_fs_edges(population=self.population, offsprings=offspring_mutated, sigma=self.sigma, alpha=self.alpha)
+            
             time_end = time.time()
             time_elimination = time_end - time_start
             
             meanObjective, bestObjective , bestSolution  = self.calculate_information_iteration()
-            print(f"\n Mean Objective --> {meanObjective} \n Best Objective --> {bestObjective}")
+            #print(f"\n Mean Objective --> {meanObjective} \n Best Objective --> {bestObjective}")
             self.check_stuck_pop(new_bestFit=self.best_objective)
             #self.check_stoppingCriteria(limit_stuck=15)
-       
-            
-            
+
+
+             
             time_end_iteration = time.time()
             diff_time_iteration = time_end_iteration - time_start_iteration
             self.update_time(time_initalization=initialization_time,time_selection=selection_time,time_crossover=time_crossover,time_mutation=time_mutation,time_elimination=time_elimination,time_mutation_population=time_mutation_population,time_local_search=time_local_search,time_iteration=diff_time_iteration)
+
+
+            # Call the reporter with:
+            #  - the mean objective function value of the population
+            #  - the best objective function value of the population
+            #  - a 1D numpy array in the cycle notation containing the best solution 
+            #    with city numbering starting from 0
+			
+            timeLeft = self.reporter.report(meanObjective, bestObjective, bestSolution)
+           
+            if timeLeft < 0:
+                break
+
+            self.check_stoppingCriteria(time_left=timeLeft,limit_stuck=15)
+            
+       
+            
+           
 
         if plot is True:
             self.plot_fitness_dynamic()
@@ -581,7 +606,12 @@ class GA_K:
         - fitness_threshold: float
             Maximum allowed fitness for valid individuals. Higher fitness individuals are discarded.
         """
-        random_prob = 1.0
+        random_prob = 0.01
+        percentage_greedy = 0.2
+        index_greedy = int(percentage_greedy*self.population_size)
+        percentage_random = 0.8
+        index_random = int(percentage_random*self.population_size)
+        print(f"Index greedy is : {index_greedy} and index random is : {index_random} of the population size {self.population_size}")
         population_size = self.population_size
         gen_size = self.gen_size
         distance_matrix = self.distance_matrix
@@ -594,14 +624,23 @@ class GA_K:
             # Add the initial solution to the population
             population[0] = self.initial_solution
             fitness[0] = self.calculate_total_distance_individual(self.initial_solution,distance_matrix=distance_matrix)
-            print(f"\nInitial solution added to the population: {population} with fitness {fitness}")
+            #print(f"\nInitial solution added to the population: {population} with fitness {fitness}")
             current_index = 1
         else:
             current_index = 0
 
         while current_index < population_size:
+            #print(f"\nPopulation progress: {current_index}")
+            if current_index <= index_greedy:
+                
+                random_prob = 0.01
+                #print(f" Greedy: Random prob is : {random_prob}")
+            else:
+                random_prob = 0.5
+                #print(f" Random: Random prob is : {random_prob}")
+            
             # Initialize a new individual incrementally
-            print(f"\nPopulation progress: {current_index}")
+           
             route = np.full(gen_size, -1, dtype=np.int32)  # -1 indicates unassigned cities
             visited = np.zeros(gen_size, dtype=bool)  # City visitation status
             current_distance = 0.0
@@ -653,14 +692,15 @@ class GA_K:
                     break
             else:
                 # If a valid individual is created (i.e., the loop didn't break)
-                print(f"CUrrent index is : {current_index}")
+                #print(f"CUrrent index is : {current_index}")
                 population[current_index] = route
                 fitness[current_index] = current_distance
                 current_index += 1
 
             # Optional status print (can be removed for better performance)
             if current_index % 100 == 0:
-                print(f"Population progress: {current_index}/{population_size}")
+                #print(f"Population progress: {current_index}/{population_size}")
+                a=12
 
         
 
@@ -817,7 +857,7 @@ class GA_K:
             remaining_cities = parent2[i, mask]
 
             # Shuffle the remaining cities to encourage diversity
-            np.random.shuffle(remaining_cities)
+            #np.random.shuffle(remaining_cities)                         #------- Importannt: Maybe too much diversity!
 
             # Find unfilled positions in the child
             unfilled_indices = np.where(children_population[i] == -1)[0]
@@ -1000,7 +1040,8 @@ class GA_K:
 
         # Ensure valid mutation range
         max_mutations = max(1, num_genes)  # Ensure at least 1 possible mutation
-        num_mutations1 = np.random.randint(1, (num_genes-1)/2)
+        #num_mutations1 = np.random.randint(1, (num_genes-1)/2)
+        num_mutations1 = np.random.randint(1, 5)
 
         # Select first set of mutation indices
         mutation_indices1 = np.random.choice(num_genes, size=num_mutations1, replace=False)
@@ -1025,6 +1066,36 @@ class GA_K:
 
         # Function to calculate the total distance of a tour (route)
     
+
+    def mutation_inversion_population(self, population):
+        mutation_rate = self.mutation_rate
+
+        # Number of individuals in the population
+        num_individuals = population.shape[0]
+        
+        # Initialize the mutated population
+        mutated_population = np.copy(population)
+        mutated_distance = self.calculate_distance_population(mutated_population)
+        best_index = np.argmin(mutated_distance)
+        
+        # Perform mutation for each individual
+        for i in range(num_individuals):
+            if np.random.rand() < mutation_rate and i != best_index:
+                mutated_population[i] = self.mutation_inversion(mutated_population[i])
+        
+        return mutated_population
+
+    def mutation_inversion(self, individual):
+        mutated_individual = np.copy(individual)
+        num_genes = len(mutated_individual)
+
+        # Randomly choose the start and end indices for inversion
+        start, end = np.sort(np.random.choice(num_genes, size=2, replace=False))
+
+        # Reverse the subsequence between the start and end indices
+        mutated_individual[start:end+1] = mutated_individual[start:end+1][::-1]
+
+        return mutated_individual
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 5) Local Search ------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1455,7 +1526,7 @@ class GA_K:
         
 
 
-        print(f"\n ------------LOCAL SEARCH------------")   
+        #print(f"\n ------------LOCAL SEARCH------------")   
        
         #print(f" Max number of iterations: {max_iterations} with epsilon: {epsilon} and last route: {last_route}")
 
@@ -1468,10 +1539,10 @@ class GA_K:
             best_route = np.copy(route)
         else:
             best_route = last_route
-            print(f"  - LS: Using last route from before:")
+            #print(f"  - LS: Using last route from before:")
             epsilon = 0.0
 
-        print(f" Max number of iterations: {max_iterations} with epsilon: {epsilon}")
+        #print(f" Max number of iterations: {max_iterations} with epsilon: {epsilon}")
     
         inital_fitness = self.calculate_total_distance_individual(route, distance_matrix)
 
@@ -1511,6 +1582,18 @@ class GA_K:
             #print(f"\n i: {i} - j: {j}")
          
             best_route[i + 1: j + 1] = best_route[i + 1: j + 1][::-1]
+
+            if len(routes) > 0:
+                start_time = time.time()
+                count = np.sum(np.all(np.array(routes)==best_route,axis=1))
+                end_time = time.time()
+                time_count = end_time - start_time
+                #print(f"Time for counting: {time_count}")
+
+                if count >=2:
+                    #print(f"  - LS: Stuck in a loop, count: {count}")
+
+                    break
    
             routes.append(np.copy(best_route))
             #print(f"Route at iteration {iteration}: {best_route}")
@@ -1542,7 +1625,7 @@ class GA_K:
             #print(f"\n Final Fitness: {final_fitness}")
             best_sol = routes_np[np.argmin(final_fitness)]
             best_fit = final_fitness[np.argmin(final_fitness)]
-            print(f"\n LS 2opt: Initial Fitness: {inital_fitness} - Final Fitness: {best_fit} at index: {np.argmin(final_fitness)} - Iterations: {iteration}") 
+            #print(f"\n LS 2opt: Initial Fitness: {inital_fitness} - Final Fitness: {best_fit} at index: {np.argmin(final_fitness)} - Iterations: {iteration}") 
 
             if inital_fitness > best_fit:
                 best_route = best_sol
@@ -1553,9 +1636,9 @@ class GA_K:
                 best_route = route
                 best_fit = inital_fitness
                 last_route = routes_np[-1]
-                print(f"            LS: Not Improved: ")
+                #print(f"            LS: Not Improved: ")
         else:
-            print(f"\n LS: No routes found")
+            #print(f"\n LS: No routes found")
             best_route = route
             best_fit = inital_fitness
   
@@ -1636,11 +1719,11 @@ class GA_K:
         
 
         if self.counter_stuck >1:
-            n_best_mut = 1
-            print(f"\n Stuck flag is on, increasing the number of best mutations to {n_best_mut}")
+            n_best_mut = n_best+2
+            #print(f"\n Stuck flag is on, increasing the number of best mutations to {n_best_mut}")
             mut_iterations = 50
-            n_best = n_best +5
-            max_iterations = 50
+            n_best = n_best +2
+            max_iterations = 300
         
             
         mut_iterations = 0
@@ -1686,8 +1769,8 @@ class GA_K:
 
             num_pop = len(best_indices_population)  
 
-        fitness_toLocalSearch = self.calculate_distance_population(population_toLocalSearch)
-        print(f"\n Fitness to local search: {fitness_toLocalSearch}")
+        #fitness_toLocalSearch = self.calculate_distance_population(population_toLocalSearch)
+        #print(f"\n Fitness to local search: {fitness_toLocalSearch}")
 
         num_total = num_pop + num_mutations
         max_iterations_toLocalSearch = max_iterations*np.ones(num_total)
@@ -1908,7 +1991,7 @@ class GA_K:
         results= []
 
         n_best = n_best +5
-        max_iterations = 2
+       
         
             
         mut_iterations = 0
@@ -1953,7 +2036,7 @@ class GA_K:
             num_pop = len(best_indices_population)  
 
         fitness_toLocalSearch = self.calculate_distance_population(population_toLocalSearch)
-        print(f"\n Fitness to local search: {fitness_toLocalSearch}")
+        #print(f"\n Fitness to local search: {fitness_toLocalSearch}")
 
         num_total = num_pop + num_mutations
         max_iterations_toLocalSearch = max_iterations*np.ones(num_total)
@@ -1974,7 +2057,8 @@ class GA_K:
         '''
         
         for id,element in enumerate(population_toLocalSearch):
-            new_sol = self.local_search_greedy_rearrange(route=element, distance_matrix=distance_matrix, max_iterations=int(max_iterations_toLocalSearch[id]))
+            #new_sol = self.local_search_greedy_rearrange(route=element, distance_matrix=distance_matrix, max_iterations=int(max_iterations_toLocalSearch[id]))
+            new_sol = local_search_greedy_rearrange_jit(route=element, distance_matrix=distance_matrix, max_iterations=int(max_iterations_toLocalSearch[id]))
               
             results.append(new_sol)
             
@@ -1990,8 +2074,8 @@ class GA_K:
         else:
             #mutation_population[best_indices_mutation] = np.array(results[:len(best_indices_mutation)])
             #population[best_indices_population] = np.array(results[len(best_indices_mutation):])
-            new_fitness = self.calculate_distance_population(np.array(results))
-            print(f"\n New Fitness: {new_fitness} vs old fitness: {fitness_toLocalSearch}")
+            #new_fitness = self.calculate_distance_population(np.array(results))
+            #print(f"\n New Fitness: {new_fitness} vs old fitness: {fitness_toLocalSearch}")
 
             for idx,element in enumerate(results):
                 #print(f"\n Element: {element} and idx: {idx}")
@@ -2070,7 +2154,7 @@ class GA_K:
         """
         best_route = route.copy()
         best_fitness = calculate_total_distance_individual(best_route, distance_matrix)
-        
+        print(f"\n Greedy LS: IMax number of iterations: {max_iterations}")
         for _ in range(max_iterations):
             #print(f"\n Iteration: {_}")
             # Select a random subsection
@@ -2123,63 +2207,56 @@ class GA_K:
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
    
     def eliminate_population_fs_tournament(self, population, offsprings, sigma, alpha, k):
-        '''
-        - Elimination with fitness sharing for TSP using k-tournament selection, ensuring the best individual is always selected,
-        and no duplicates are selected during the process.
-        '''
+        """
+        Elimination with fitness sharing for TSP using k-tournament selection.
+        Ensures the best individual is always selected and avoids duplicates.
+        """
         # 1) Combine population & calculate their fitness
         combined_population = np.vstack((population, offsprings))
-        
+
         combined_fitness, _, _ = self.fitness_function_calculation(
-            population=combined_population, 
-            weight_distance=self.weight_distance, 
-            weight_bdp=self.weight_bdp, 
+            population=combined_population,
+            weight_distance=self.weight_distance,
+            weight_bdp=self.weight_bdp,
             distance_matrix=self.distance_matrix
         )
-        
+
         # 2) Initialize survivors
-        survivors_idxs = -1 * np.ones(self.population_size, dtype=int)  # Initialize survivors
-        
-        # Select the best individual (lowest fitness) and store in the first slot
-        best_index = np.argmin(combined_fitness)
-        survivors_idxs[0] = best_index
+        survivors_idxs = []
+        best_index = np.argmin(combined_fitness)  # Get the index of the best individual
+        survivors_idxs.append(best_index)  # Always include the best individual first
 
-        # Exclude the best individual from valid candidates
-        valid_candidates = np.setdiff1d(np.arange(len(combined_population)), [best_index])
+        # Create a mask to track valid individuals
+        valid_mask = np.ones(len(combined_population), dtype=bool)
+        valid_mask[best_index] = False  # Mark the best individual as already selected
 
-        # 3) Perform k-tournament selection for the remaining survivors
-        for i in range(1, self.population_size):
-            #print(f"Selecting survivor {i + 1}/{self.population_size}")
-            
+        # 3) Perform k-tournament selection for remaining survivors
+        while len(survivors_idxs) < self.population_size:
             # Compute fitness sharing for the remaining individuals
             new_fitness = self.fitness_sharing_individual_np(
-                population=combined_population, 
-                survivors=survivors_idxs[:i],  # Pass only the selected survivors so far
-                population_fitness=combined_fitness, 
-                sigma=sigma, 
+                population=combined_population,
+                survivors=survivors_idxs,
+                population_fitness=combined_fitness,
+                sigma=sigma,
                 alpha=alpha
             )
-            
+
             # Randomly select k candidates from the valid candidates
-            if len(valid_candidates) > 0:  # Ensure we have valid candidates
-                tournament_candidates = np.random.choice(valid_candidates, size=min(k, len(valid_candidates)), replace=False)
-            else:
+            valid_indices = np.where(valid_mask)[0]  # Get indices of valid candidates
+            if len(valid_indices) == 0:
                 raise ValueError("No valid candidates remain for selection.")
-            
-            # Select the individual with the best fitness from the tournament
+
+            tournament_candidates = np.random.choice(valid_indices, size=min(k, len(valid_indices)), replace=False)
+
+            # Select the individual with the best fitness among the tournament candidates
             best_in_tournament = tournament_candidates[np.argmin(new_fitness[tournament_candidates])]
-            
+
             # Add the best candidate to survivors
-            survivors_idxs[i] = best_in_tournament
-            
-            # Remove the selected candidate from valid candidates
-            valid_candidates = valid_candidates[valid_candidates != best_in_tournament]
-            
-            # If valid_candidates is empty before filling the population, break early (unlikely edge case)
-            if len(valid_candidates) == 0 and i < self.population_size - 1:
-                print("Warning: Not enough unique individuals to fill the population.")
-                break
-        
+            survivors_idxs.append(best_in_tournament)
+
+            # Update the mask to exclude the selected individual
+            valid_mask[best_in_tournament] = False
+
         # 4) Select the best individuals from the combined population
         self.population = combined_population[survivors_idxs]
         self.fitness = combined_fitness[survivors_idxs]
@@ -2188,41 +2265,53 @@ class GA_K:
         self.hamming_distance, _ = self.calculate_hamming_distance_population(self.population)
 
     def eliminate_population_fs(self, population, offsprings, sigma, alpha):
-        '''
-        - Elimination with fitness sharing for TSP
-        '''
+        """
+        Elimination with fitness sharing for TSP.
+        """
         # 1) Combine population & calculate their fitness
         combined_population = np.vstack((population, offsprings))
-        
 
-        combined_fitness, _, _ = self.fitness_function_calculation(population=combined_population, 
-                                                                weight_distance=self.weight_distance, 
-                                                                weight_bdp=self.weight_bdp, 
-                                                                distance_matrix=self.distance_matrix)
+        combined_fitness, _, _ = self.fitness_function_calculation(
+            population=combined_population,
+            weight_distance=self.weight_distance,
+            weight_bdp=self.weight_bdp,
+            distance_matrix=self.distance_matrix
+        )
 
         # 2) Initialize survivors and get the best individual
-        survivors_idxs = -1 * np.ones(self.population_size, dtype=int)  # Initialize survivors
+        survivors_idxs = []
         best_index = np.argmin(combined_fitness)  # Index of the best individual (minimum fitness)
-        survivors_idxs[0] = best_index  # The first survivor is the best individual
+        survivors_idxs.append(best_index)  # Add the best individual to the survivors
 
-        counter = 1  # Start filling from index 1 since index 0 is already filled
-        while np.any(survivors_idxs == -1):
-            #print(f"Counter: {counter}")
+        # Create a mask to track valid individuals
+        valid_mask = np.ones(len(combined_population), dtype=bool)
+        valid_mask[best_index] = False  # Mark the best individual as already selected
+
+        # Start filling survivors
+        while len(survivors_idxs) < self.population_size:
             # Compute fitness sharing for the remaining individuals
-            new_fitness = self.fitness_sharing_individual_np(population=combined_population, survivors=survivors_idxs, 
-                                                        population_fitness=combined_fitness, sigma=sigma, alpha=alpha)
+            new_fitness = self.fitness_sharing_individual_np(
+                population=combined_population,
+                survivors=survivors_idxs,
+                population_fitness=combined_fitness,
+                sigma=sigma,
+                alpha=alpha
+            )
 
+            # Set the fitness of already-selected individuals to infinity to exclude them
+            valid_fitness = np.where(valid_mask, new_fitness, np.inf)
+            
             # Get the index of the next best individual
-            best_index = np.argmin(new_fitness)
-            survivors_idxs[counter] = best_index  # Add this individual to the survivors
-            counter += 1
+            best_index = np.argmin(valid_fitness)
+            survivors_idxs.append(best_index)  # Add to survivors
+            valid_mask[best_index] = False  # Update the mask to exclude this individual
 
         # 4) Select the best individuals from the combined population
         self.population = combined_population[survivors_idxs]
         self.fitness = combined_fitness[survivors_idxs]
         self.distance_scores = self.calculate_distance_population(self.population)
         self.average_bpd_scores = self.average_bpd(self.population)
-        self.hamming_distance,_ = self.calculate_hamming_distance_population(self.population)
+        self.hamming_distance, _ = self.calculate_hamming_distance_population(self.population)
         
 
     def eliminate_population(self, population, offsprings):
@@ -2419,9 +2508,7 @@ class GA_K:
                 #self.mutation_rate = self.mutation_rate + 20
             
         
-            
-        
-        
+    
     def insert_individual(self,num_best_keep, population,fitness_scores):
         '''
         - Insert the individual in the population
@@ -2453,6 +2540,46 @@ class GA_K:
         return new_population, new_fitness_scores, new_distance_scores, new_bdp_scores
 
 
+
+    def eliminate_population_fs_edges(self, population, offsprings, sigma, alpha):
+        '''
+        - Elimination with fitness sharing for TSP
+        '''
+        # 1) Combine population & calculate their fitness
+        combined_population = np.vstack((population, offsprings))
+
+        self.calculate_edges_population(population=combined_population)
+        
+
+        combined_fitness, _, _ = self.fitness_function_calculation(population=combined_population, 
+                                                                weight_distance=self.weight_distance, 
+                                                                weight_bdp=self.weight_bdp, 
+                                                                distance_matrix=self.distance_matrix)
+
+        # 2) Initialize survivors and get the best individual
+        survivors_idxs = -1 * np.ones(self.population_size, dtype=int)  # Initialize survivors
+        best_index = np.argmin(combined_fitness)  # Index of the best individual (minimum fitness)
+        survivors_idxs[0] = best_index  # The first survivor is the best individual
+
+        counter = 1  # Start filling from index 1 since index 0 is already filled
+        while np.any(survivors_idxs == -1):
+            #print(f"Counter: {counter}")
+            # Compute fitness sharing for the remaining individuals
+            new_fitness = self.fitness_sharing_individual_np_edges(population=combined_population, survivors=survivors_idxs, 
+                                                        population_fitness=combined_fitness, sigma=sigma, alpha=alpha)
+
+            # Get the index of the next best individual
+            best_index = np.argmin(new_fitness)
+            survivors_idxs[counter] = best_index  # Add this individual to the survivors
+            #print(f"Best index: {best_index} is added to the survivors")
+            counter += 1
+
+        # 4) Select the best individuals from the combined population
+        self.population = combined_population[survivors_idxs]
+        self.fitness = combined_fitness[survivors_idxs]
+        self.distance_scores = self.calculate_distance_population(self.population)
+        self.average_bpd_scores = self.average_bpd(self.population)
+        self.hamming_distance,_ = self.calculate_hamming_distance_population(self.population)
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 6) Fitness Calculation ------------------------------------------------------------------------------------------------
@@ -2709,6 +2836,103 @@ class GA_K:
         return avg_diversity, hamming_distances
 
 
+    
+    # --------- Fitness Sharing with Commone edges:
+    def fitness_sharing_individual_np_edges(self, population, survivors, population_fitness, sigma, alpha):
+        '''
+        - Vectorized fitness sharing for TSP using `calculate_hamming_distance_individual`.
+        - Computes the fitness for each individual based on its pairwise Hamming distance to the survivors.
+        '''
+        # Number of individuals in the population
+        num_individuals = len(population)
+        
+        # Initialize the fitness sharing multipliers as 1
+        fitness_sharing = np.ones(num_individuals)
+        
+        # For each survivor, apply fitness sharing to all individuals
+        for survivor_idx in survivors:
+            if survivor_idx == -1:
+                break
+            
+            # Get the survivor
+            survivor = population[survivor_idx]
+            
+            # Compute pairwise Hamming distances for each individual to the current survivor
+            #survivor_distances = np.array([self.calculate_hamming_distance_individual(ind, survivor) for ind in population])
+            survivor_distances = np.array([self.calculate_common_edges(ind1=ind, ind2=survivor) for ind in population])
+            print(f"Survivor distances: {survivor_distances}")
+            
+            
+            
+            
+            # Apply the fitness sharing: if distance <= sigma, apply the sharing term (1 + alpha), else 1
+            sharing_term = np.where(survivor_distances <= sigma, (1-((survivor_distances)/sigma)**alpha), 1)
+            # Handle identical individuals (distance = 0) explicitly by applying the penalty
+            #sharing_term[survivor_distances == 0] = 1 - (1 / sigma) ** alpha  # Apply custom penalty for identical individuals
+            sharing_term[survivor_distances == 0] = 0.00000000000000000001  # Apply custom penalty for identical individuals
+            print(f"Sharing term: {sharing_term}")
+            
+            # Multiply the fitness sharing terms with the current fitness sharing values
+            fitness_sharing *= 1/sharing_term
+        
+        # Compute the new fitness values by applying the sharing effect
+        #print(f"Fitness sharing: {fitness_sharing}")
+        print(f"Population fitness: {population_fitness}")
+        fitness_new = population_fitness * fitness_sharing
+        print(f"Fitness new: {fitness_new}")
+        
+        return fitness_new
+
+
+    def calculate_edges_population(self,population):
+        
+        for individual in population:
+            # Check if the edges for the individual have already been calculated and stored
+            
+            individual_key = tuple(individual)  # Converting the numpy array to a tuple
+
+            if individual_key not in self.edges_dict:
+                # Calculate edges using the build_edges method
+                edges = build_edges(order=individual, length=len(individual))  # Call build_edges on the order
+                self.edges_dict[individual_key] = edges  # Store the calculated edges in the dictionary
+        #print(f"Edges dict: {self.edges_dict}")
+
+    def calculate_common_edges(self,ind1,ind2):
+        '''
+        - Calculate the common edges between two individuals
+        '''
+
+        #print(f"Individual 1: {ind1}")
+        #print(f"Individual 2: {ind2}")
+        # Convert the individuals (arrays) to tuples so they can be used as dictionary keys
+        ind1_key = tuple(ind1)
+        ind2_key = tuple(ind2)
+
+        # Get the edges for the two individuals
+        edges1 = self.edges_dict[ind1_key]
+        edges2 = self.edges_dict[ind2_key]
+
+        # Calculate the common edges using set intersection
+        common_edges = set(edges1).intersection(edges2)
+
+        # Normalize by the number of edges in each individual
+        normalization_factor = min(len(edges1), len(edges2))
+
+        # Calculate the normalized score (ratio of common edges to the total number of edges for the least-sized individual)
+        normalized_common_edges = len(common_edges) / normalization_factor if normalization_factor > 0 else 0
+
+        #print(f"Common edges: {len(common_edges)} with common edges: {common_edges}")   
+        #print(f"Normalized Common edges: {normalized_common_edges}")
+        #print(f"Return: {1-normalized_common_edges}")
+
+        return 1-normalized_common_edges
+            
+
+
+            
+
+
+
 
     def caclulate_numberRepeatedSolution(self,population):
         '''
@@ -2776,7 +3000,7 @@ class GA_K:
 
         # Set the title and axis labels for the objective plot
         fig_obj.update_layout(
-            title=f'Objective Distance over Iterations with mutation rate {self.mutation_rate*100} %',
+            title=f'Objective Distance over Iterations with mutation rate {self.mutation_rate} % and sigma: {self.sigma} and alpha: {self.alpha}',
             xaxis_title='Iterations',
             yaxis_title='Objective Distance',
             legend=dict(x=0, y=1),
@@ -3887,11 +4111,100 @@ def mutation_singlepoint(route, mutation_rate=1):
 
 
 
+@jit(nopython=True)
+def greedy_rearrange_subsection_jit(route, distance_matrix, start_index, end_index):
+    """
+    Rearrange a subsection of the route using a greedy strategy.
 
+    Parameters:
+    - route: Current route (1D array of city indices).
+    - distance_matrix: Distance matrix.
+    - start_index: Start index of the subsection to rearrange.
+    - end_index: End index of the subsection to rearrange (inclusive).
 
+    Returns:
+    - new_route: Route with the subsection rearranged.
+    """
+    # Extract the subsection
+    subsection = route[start_index:end_index+1]
+    
+    # Initialize greedy rearrangement
+    rearranged = np.empty(len(subsection), dtype=np.int64)
+    visited = set()
+    
+    # Start with the first city in the subsection
+    current_city = subsection[0]
+    rearranged[0] = current_city
+    visited.add(current_city)
+    
+    for i in range(1, len(subsection)):
+        # Find the nearest unvisited city
+        remaining_cities = np.array([city for city in subsection if city not in visited])
+        distances = np.array([distance_matrix[current_city, city] for city in remaining_cities])
+        
+        # Get the next city
+        next_city = remaining_cities[np.argmin(distances)]
+        rearranged[i] = next_city
+        visited.add(next_city)
+        current_city = next_city
+    
+    # Replace the subsection in the route
+    new_route = route.copy()
+    new_route[start_index:end_index+1] = rearranged
+
+    return new_route
+
+@jit(nopython=True)
+def local_search_greedy_rearrange_jit(route, distance_matrix, max_iterations=50):
+    """
+    Apply local search by rearranging random subsections of the route using a greedy strategy.
+    
+    Parameters:
+    - route: Initial route (1D array of city indices).
+    - distance_matrix: Distance matrix.
+    - max_iterations: Maximum number of iterations for the local search.
+    
+    Returns:
+    - best_route: Optimized route.
+    - best_fitness: Fitness of the optimized route.
+    """
+    best_route = route.copy()
+    best_fitness = fitness(distanceMatrix=distance_matrix,order=best_route)
+    #print(f" LS_greedy: max iterations: {max_iterations}")
+    for _ in range(max_iterations):
+        #print(f"\n Iteration: {_}")
+        # Select a random subsection
+        start_index = np.random.randint(0, len(route) - 1)
+        end_index = np.random.randint(start_index + 1, len(route))
+        
+        # Rearrange the subsection
+        new_route = greedy_rearrange_subsection_jit(best_route, distance_matrix, start_index, end_index)
+        new_fitness = fitness(distanceMatrix=distance_matrix,order=new_route)
+        #print(f"\        + Fitness before: {best_fitness} - Fitness after: {new_fitness}")
+        
+        # Update the best solution if improvement is found
+        if new_fitness < best_fitness:
+            #print(f"\        + Fitness before: {best_fitness} - Fitness after: {new_fitness}")
+            best_route = new_route
+            best_fitness = new_fitness
+    
+    return best_route
 
         
 
+
+# Calculate edges
+#@jit(nopython=True)
+def build_edges(order,length):
+    edges = [None] * length
+    prev = order[0]
+    for i in range(length):
+        next = order[(i + 1) % length]
+        edges[i] = (prev, next)
+        prev = next
+    edges = set(edges)
+    return edges
+    
 
 
 
