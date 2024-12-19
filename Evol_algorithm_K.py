@@ -17,7 +17,7 @@ import os
 
 class r0818807:
 
-    def __init__(self,cities,seed=None ,mutation_rate = 0.1,elitism_percentage = 20,local_search=True,max_iterations = 200, sigma_value = 0.1):
+    def __init__(self,cities,seed=None ,mutation_rate = 0.1,mutation_rate_pop = 0.1,elitism_percentage = 20,local_search=True,max_iterations = 200, sigma_value = 0.1):
         #Reporter:
         self.reporter = Reporter.Reporter(self.__class__.__name__)
         
@@ -26,7 +26,8 @@ class r0818807:
         self.k_tournament_k = 3
         self.population_size = 0.0
         #self.mutation_rate = mutation_prob
-        self.mutation_rate = mutation_rate   # Prev 0.8 or 0.5
+        self.mutation_rate = 0.8   # Prev 0.8 or 0.5
+        self.mutation_rate_pop = 0.8
         self.elistism = 1
 
         self.max_iterations = max_iterations     
@@ -36,7 +37,7 @@ class r0818807:
         self.stuck_flag = False  
         
         # Fitness Sharing
-        self.sigma = sigma_value   # Prev 0.9
+        self.sigma = 0.8  # Prev 0.9
         self.alpha = 0.1   # Prev 0.1
 
 
@@ -111,7 +112,8 @@ class r0818807:
 
         #Random seed
         if seed is not None:
-            np.random.seed(seed)    
+            #np.random.seed(seed) 
+            a = 1   
         
         
 
@@ -368,7 +370,7 @@ class r0818807:
         
        
         self.initial_iter = 200
-        self.max_iter_ls = 200
+        self.max_iter_ls = 50
     
        
         #num_iterations = 200
@@ -399,7 +401,7 @@ class r0818807:
             
 
             time_start = time.time()
-            offspring_mutated = self.mutation_singlepoint_population(offspring1)
+            offspring_mutated = self.mutation_singlepoint_population(offspring1,offsprings_flag=True)
             offspring_mutated = self.mutation_inversion_population(offspring_mutated)
             time_end = time.time()
             time_mutation = time_end - time_start
@@ -409,7 +411,7 @@ class r0818807:
 
             #Mutate also population
             time_start = time.time()
-            self.population = self.mutation_singlepoint_population(self.population)
+            self.population = self.mutation_singlepoint_population(self.population,offsprings_flag=False)
             #self.population = self.mutation_inversion_population(self.population)
             time_end = time.time()
             time_mutation_population = time_end - time_start
@@ -425,8 +427,8 @@ class r0818807:
                 #offspring_mutated, self.population = self.local_search_population_jit(population=self.population,mutation_population=offspring_mutated,n_best = 3,max_iterations=200)
                 
                 if self.stuck_flag or iterations < 3:
-                    if self.counter_stuck > 100 and iterations % 100 == 0:
-                        self.population,offspring_mutated= self.local_search_population_2opt_multip(population=self.population,mutation_population=offspring_mutated,n_best = 3,
+                    if self.counter_stuck > 50 and iterations % 50 == 0:
+                        self.population,offspring_mutated= self.local_search_population_2opt_multip(population=self.population,mutation_population=offspring_mutated,n_best = 2,
                                                                                                 max_iterations=self.max_iter_ls,k_neighbors=30,heavy_ls=True,random=False)
                         #self.population, offspring_mutated = self.local_search_population_2opt_multip_parallel(population=self.population,mutation_population=offspring_mutated,n_best = 1,
                                                                                                                #max_iterations=self.max_iter_ls)
@@ -1010,8 +1012,11 @@ class r0818807:
 
 
 
-    def mutation_singlepoint_population(self, population):
-        mutation_rate = self.mutation_rate
+    def mutation_singlepoint_population(self, population,offsprings_flag=False):
+        if offsprings_flag:
+            mutation_rate = self.mutation_rate
+        else:
+            mutation_rate = self.mutation_rate_pop
 
         # Number of individuals in the population
         num_individuals = population.shape[0]

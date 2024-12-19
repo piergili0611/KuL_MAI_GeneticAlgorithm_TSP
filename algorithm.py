@@ -683,8 +683,11 @@ class algorithm:
                 writer.writerow([f"# Filename: {filename}"])
                 writer.writerow(["Iteration", "Best Fitness", "Mean Fitness"])
             
-    def post_process_csv(self):
-        directory = "Results\Results_750_Hyperparameter"
+    def post_process_csv(self,flag_750=False):
+        if flag_750:
+            directory = "Results\Results_750_Hyperparameter"
+        else:
+            directory = "Results\Results_1000_Hyperparameter"
         legend_labels = ["Mutation Rate: 0.1 & Sigma: 0.1", "Mutation Rate: 0.1 & Sigma: 0.5", "Mutation Rate: 0.1 & Sigma: 0.8",
                          "Mutation Rate: 0.5 & Sigma: 0.1", "Mutation Rate: 0.5 & Sigma: 0.5", "Mutation Rate: 0.5 & Sigma: 0.8",
                          "Mutation Rate: 0.8 & Sigma: 0.1", "Mutation Rate: 0.8 & Sigma: 0.5", "Mutation Rate: 0.8 & Sigma: 0.8"]
@@ -766,14 +769,14 @@ class algorithm:
 
         # Customizing the plot
         plt.title("Hyperparameter search of 750 cities instance problem using Box-and-Whisker Plot", fontsize=16, weight='bold')
-        plt.ylabel(ylabel, fontsize=14)
-        plt.xlabel("Parameters", fontsize=14)
+        plt.ylabel(ylabel, fontsize=18)
+        plt.xlabel("Parameters", fontsize=18)
 
         # Replace x-axis ticks with legend labels if provided
         if legend_labels:
             plt.xticks(ticks=range(len(legend_labels)), labels=legend_labels, rotation=45, fontsize=12)
         else:
-            plt.xticks(rotation=45, fontsize=12)
+            plt.xticks(rotation=45, fontsize=14)
 
         plt.yticks(fontsize=12)
         plt.tight_layout()
@@ -800,9 +803,9 @@ class algorithm:
         # Position the legend outside the plot
         plt.legend(
             handles=handles,
-            loc='center left',  # Place it to the left-center of the axes
-            bbox_to_anchor=(1.02, 0.5),  # Outside the plot on the right
-            fontsize=12,
+            loc='upper right',  # Place it in the top-right corner inside the plot
+            #bbox_to_anchor=(1.02, 0.5),  # Outside the plot on the right
+            fontsize=18,
             frameon=True
         )
         plt.show()

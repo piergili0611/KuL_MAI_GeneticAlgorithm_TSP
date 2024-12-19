@@ -91,12 +91,12 @@ class r0818807:
 
 		self.algorithm.run_test_algorithm(number_oftimes=outer_iterations,test_mutation_rates=test_mutation_rates)
 		
-	def post_processing(self,filename):
+	def post_processing(self,filename,flag_750):
 		
 		self.load_distance_matrix(filename)
 		self.load_algorithm()
 		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
-		self.algorithm.post_process_csv()
+		self.algorithm.post_process_csv(flag_750=flag_750)
 
 
 	# The evolutionary algorithm's main loop
