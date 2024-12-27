@@ -8,7 +8,7 @@ from Evol_algorithm_K import r0818807
 from Evol_algorithm_L2 import GA_K_L2
 from k_clusters import k_clusters
 from cities import cities
-from clusterdashboard import ClusterDashboard
+#from clusterdashboard import ClusterDashboard
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os,sys
 import pandas as pd 
@@ -24,13 +24,15 @@ class algorithm:
         self.GA_level1_model = None
         self.GA_level2_model = None
         self.K_clusters_model = None
-        self.cluster_dashboard = ClusterDashboard()
+        #self.cluster_dashboard = ClusterDashboard()
         self.distanceMatrix = None
         self.clusters_list = []
         self.distance_matrix_cluster_list = []
 
         self.deltatime_cluster_list = []
         self.clusters_solution_list = []
+
+        self.cities_cluster_list = []
         
 
         #To check k_clusterl model
@@ -128,8 +130,16 @@ class algorithm:
         '''
         - Generate the distance matrix for the clusters
         '''
-        self.distance_matrix_cluster_list,self.cities_cluster_list = self.K_clusters_model.generate_distance_matrix_cluster(self.cluster_list)
-
+        #self.distance_matrix_cluster_list,self.cities_cluster_list = self.K_clusters_model.generate_distance_matrix_cluster(self.cluster_list)
+        self.distance_matrix_cluster_list = [self.distance_matrix]
+        cities_list = []
+        for element in range(len(self.distance_matrix)):
+            #print(f"Element: {element}")
+            cities_list.append(element)
+            
+            a = 1
+        self.cities_cluster_list.append(cities_list)
+        print(f"Distance matrix cluster list: {self.distance_matrix_cluster_list}& Cities cluster list: {self.cities_cluster_list}")
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 3) GA_Level1 ------------------------------------------------------------------------------------------------
@@ -420,10 +430,11 @@ class algorithm:
 
 
         if clusters:
-            self.add_run_k_cluster_model()
+            #self.add_run_k_cluster_model()
+            a = 1
         else:
-            self.add_run_k_cluster_model(num_clusters=1)
-
+            #self.add_run_k_cluster_model(num_clusters=1)
+            a = 0
         
         self.K_cluster_model_generate_distance_matrix_cluster()
 
