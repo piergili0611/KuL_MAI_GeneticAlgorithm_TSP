@@ -801,16 +801,71 @@ class algorithm:
         '''
 
         # Position the legend outside the plot
+        # Position the legend outside the plot
         plt.legend(
-            handles=handles,
-            loc='upper right',  # Place it in the top-right corner inside the plot
-            #bbox_to_anchor=(1.02, 0.5),  # Outside the plot on the right
+            handles=handles,  # Define your handles for the legend
+            loc='upper left',  # Anchor the legend to the top-left of the plot's bounding box
+            bbox_to_anchor=(1.05, 1),  # Position the legend outside the plot
             fontsize=18,
             frameon=True
         )
+
+        # Adjust the layout to prevent clipping of the legend
+        plt.subplots_adjust(right=0.8)  # This adjusts the space for the plot (reduce the right margin)
         plt.show()
+
+
+
+    def post_process_histogram_csv(self):
+       
+        directory = "Results\Results_50_Histogram"
         
-    
+        combined_pd = self.combine_csv_files(directory)
+
+        # Calculate the mean and standard deviation for each group
+        mean_values = combined_pd['Best Fitness'].mean()
+        std_values = combined_pd['Best Fitness'].std()
+        print(f"Mean values: {mean_values}")
+        print(f"Std values: {std_values}")
+        #print(f"Combined pd: {combined_pd}")
+        self.plot_histogram(df=combined_pd)
+        #self.plot_boxplot(combined_pd)
+        #self.plot_custom_boxplot(combined_pd, x_col='Filename', y_col='Best Fitness', ylabel='Distance', legend_labels=legend_labels)
+        #     
+    def plot_histogram(self, df):
+        # Set up Seaborn style
+        #sns.set_theme(style="whitegrid")
+        sns.set_theme(style="white")  # Removes the grid lines
+
+
+        # Create a histogram using Seaborn
+        plt.figure(figsize=(20, 12))
+        sns.histplot(
+            df["Best Fitness"],
+            bins=40,  # Decrease number of bins to make bars wider
+            binrange=[25000, 26000],  # Ensure range matches the data
+            #kde=True,
+            color="purple",
+        )
+
+        sns.histplot(
+            df["Mean Fitness"],
+            bins=100,  # Decrease number of bins to make bars wider
+            binrange=[25000, 45000],  # Ensure range matches the data
+            #kde=True,
+            color="orange",
+        )
+
+        # Set labels and title
+        plt.xlabel("Best Fitness (distance)", fontsize=18)
+        plt.ylabel("Frequency", fontsize=18)
+        # Customize x and y tick labels
+        plt.xticks(fontsize=18)  # Increase font size for x-tick labels
+        plt.yticks(fontsize=18)  # Increase font size for y-tick labels
+        plt.title("Distribution of Best and Mean fitness values for 50 Cities instance problem.", fontsize=30)
+        plt.legend(["Best Fitness", "Mean Fitness"], fontsize=20)
+        # Show the plot
+        plt.show()
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     #--------------------------------------------------------------------- 7) Extras: Execution Time, Plots ------------------------------------------------------------------------------------------------
@@ -860,6 +915,7 @@ class algorithm:
 
         # Show the first plot
         fig_obj.show()
+
 
     def plot_test_histogram(self,best_fitness_list, mean_fitness_list):
         '''

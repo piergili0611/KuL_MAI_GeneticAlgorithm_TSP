@@ -352,7 +352,7 @@ class r0818807:
         '''
         - Check the stopping criteria
         '''
-        if time_left < 0:
+        if time_left < 200:
             self.stopping_criteria = True
         else:
             self.stopping_criteria = False
@@ -364,13 +364,25 @@ class r0818807:
     def run_model(self,plot = False):
         time_start = time.time()
         #self.set_initialization()
+        self.initial_iter = 200
+        self.max_iter_ls = 50
+
+        if self.gen_size <= 750:
+            self.mutation_rate = 0.8
+            self.mutation_rate_pop = 0.8
+            self.sigma = 0.8
+            
+        elif self.gen_size == 1000:
+            self.mutation_rate = 0.1
+            self.mutation_rate_pop = 0.1
+            self.sigma = 0.5
+
         self.set_initialization_onlyValid_numpy_incremental(fitness_threshold=1e5)
         time_end = time.time()
         initialization_time = time_end - time_start 
         
        
-        self.initial_iter = 200
-        self.max_iter_ls = 50
+        
     
        
         #num_iterations = 200

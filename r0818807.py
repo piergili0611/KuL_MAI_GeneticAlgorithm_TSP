@@ -98,6 +98,13 @@ class r0818807:
 		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
 		self.algorithm.post_process_csv(flag_750=flag_750)
 
+	def post_processing_histogram(self,filename):
+		
+		self.load_distance_matrix(filename)
+		self.load_algorithm()
+		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+		self.algorithm.post_process_histogram_csv()
+
 
 	# The evolutionary algorithm's main loop
 	def optimize_old(self, filename,mutation_prob=0.008):
