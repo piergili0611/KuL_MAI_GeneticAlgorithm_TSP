@@ -1,156 +1,183 @@
 import Reporter
 import numpy as np
 from algorithm import algorithm
+import shutil
+import os
 
+# Global_Variables: 
+FOLDER_RESULTS = "Results"
+results_sim_folder = None
 # Modify the class name to match your student number.
+
 class r0818807:
 
-	def __init__(self):
-		#self.reporter = Reporter.Reporter(self.__class__.__name__)
-		self.num_simulations_to_run = 2
-		self.distanceMatrix = None
-		self.algorithm = None
-		self.filename = None
+    def __init__(self):
+        #self.reporter = Reporter.Reporter(self.__class__.__name__)
+        self.num_simulations_to_run = 2
+        self.distanceMatrix = None
+        self.algorithm = None
+        self.filename = None
 
-	def load_distance_matrix(self, filename):
-		self.filename = filename
-		file = open(filename)
-		distanceMatrix = np.loadtxt(file, delimiter=",")
+    def load_distance_matrix(self, filename):
+        self.filename = filename
+        file = open(filename)
+        distanceMatrix = np.loadtxt(file, delimiter=",")
 
-		#replace if there are any infinities in the distance matrix
-		distanceMatrix[distanceMatrix == np.inf] = 100000
-		file.close()
-		self.distanceMatrix = distanceMatrix
+        #replace if there are any infinities in the distance matrix
+        distanceMatrix[distanceMatrix == np.inf] = 100000
+        file.close()
+        self.distanceMatrix = distanceMatrix
 
-	def load_algorithm(self,number_of_cities=None):
-		self.algorithm = algorithm(num_cities=number_of_cities)
+    def load_algorithm(self,number_of_cities=None):
+        self.algorithm = algorithm(num_cities=number_of_cities)
 
-	def creatAndGet_distnace_matrix(self,filename):
-		self.load_distance_matrix(filename=filename)
-		return self.distanceMatrix
-		
+    def creatAndGet_distnace_matrix(self,filename):
+        self.load_distance_matrix(filename=filename)
+        return self.distanceMatrix
+        
 
-	def run_k_means_algorithm(self, filename):
-		self.load_distance_matrix(filename)
+    def run_k_means_algorithm(self, filename):
+        self.load_distance_matrix(filename)
 
-		# 1) Create algorithm object and set distance matrix
-		self.load_algorithm()
-		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+        # 1) Create algorithm object and set distance matrix
+        self.load_algorithm()
+        self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
 
-		# 2) Add K_clusters model
-		self.algorithm.add_K_clusters_model()
+        # 2) Add K_clusters model
+        self.algorithm.add_K_clusters_model()
 
-		# 3) Run the K_clusters model
-		self.algorithm.run_k_cluster_model()
+        # 3) Run the K_clusters model
+        self.algorithm.run_k_cluster_model()
 
-	def test_k_means_algorithm(self, filename):
-		self.load_distance_matrix(filename)
+    def test_k_means_algorithm(self, filename):
+        self.load_distance_matrix(filename)
 
-		# 1) Create algorithm object and set distance matrix
-		self.load_algorithm()
-		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+        # 1) Create algorithm object and set distance matrix
+        self.load_algorithm()
+        self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
 
-		# 2) ACreate cities and test the cluster
-		self.algorithm.test_k_cluster_model()
+        # 2) ACreate cities and test the cluster
+        self.algorithm.test_k_cluster_model()
 
-	def run(self,filename,generateDataSets = True,clusters=True,local_search=True):
-		'''
-		- Run the algorithm
-		'''
-		if generateDataSets:
-			number_of_cities = int(filename.split(".")[0].split("tour")[1])
+    def run(self,filename,generateDataSets = True,clusters=True,local_search=True):
+        '''
+        - Run the algorithm
+        '''
+        global results_sim_folder
 
-			self.load_algorithm(number_of_cities=number_of_cities)
-			self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets,local_search=local_search)
+        sim_path = self.create_sim_folder(parent_folder=FOLDER_RESULTS)
+        results_sim_folder = os.path.join(FOLDER_RESULTS, sim_path)
+        if generateDataSets:
+            number_of_cities = int(filename.split(".")[0].split("tour")[1])
 
-		else:
-			
-			self.load_distance_matrix(filename)
+            self.load_algorithm(number_of_cities=number_of_cities)
+            self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets,local_search=local_search)
 
-			self.load_algorithm()
-			self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
-			
-			self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets,local_search=local_search)
-		
+        else:
+            
+            self.load_distance_matrix(filename)
 
-	
-	def optimize(self,filename):
-		'''
-		- Run the algorithm
-		'''
-		self.run(filename=filename,generateDataSets=False,clusters=False,local_search=True)
-		
-		return 0
+            self.load_algorithm()
+            self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+            
+            self.algorithm.run_algorithm_main(clusters=clusters,generateDataSets=generateDataSets,local_search=local_search)
+        
+    def run_test_algorithm(self,filename,outer_iterations=1,test_mutation_rates=False):
+        self.load_distance_matrix(filename)
+        self.load_algorithm()
+    
 
-	def run_test_multipleTimes(self,filename,outer_iterations=1,test_mutation_rates=False):
-		
+    def optimize(self,filename):
+        '''
+        - Run the algorithm
+        '''
+        self.run(filename=filename,generateDataSets=False,clusters=False,local_search=True)
+        
+        return 0
 
-		self.load_distance_matrix(filename)
-		self.load_algorithm()
-		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+    def run_test_multipleTimes(self,filename,outer_iterations=1,test_mutation_rates=False):
+        
 
-		self.algorithm.run_test_algorithm(number_oftimes=outer_iterations,test_mutation_rates=test_mutation_rates)
-		
-	def post_processing(self,filename,flag_750):
-		
-		self.load_distance_matrix(filename)
-		self.load_algorithm()
-		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
-		self.algorithm.post_process_csv(flag_750=flag_750)
+        self.load_distance_matrix(filename)
+        self.load_algorithm()
+        self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
 
-	def post_processing_histogram(self,filename):
-		
-		self.load_distance_matrix(filename)
-		self.load_algorithm()
-		self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
-		self.algorithm.post_process_histogram_csv()
+        self.algorithm.run_test_algorithm(number_oftimes=outer_iterations,test_mutation_rates=test_mutation_rates)
+        
+    def post_processing(self,filename,flag_750):
+        
+        self.load_distance_matrix(filename)
+        self.load_algorithm()
+        self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+        self.algorithm.post_process_csv(flag_750=flag_750)
+
+    def post_processing_histogram(self,filename):
+        
+        self.load_distance_matrix(filename)
+        self.load_algorithm()
+        self.algorithm.set_distance_matrix(distance_matrix=self.distanceMatrix)
+        self.algorithm.post_process_histogram_csv()
 
 
-	# The evolutionary algorithm's main loop
-	def optimize_old(self, filename,mutation_prob=0.008):
-		# Read distance matrix from file.		
-		file = open(filename)
-		distanceMatrix = np.loadtxt(file, delimiter=",")
-		file.close()
-		
+    def create_sim_folder(self, parent_folder):
+        """
+        - Creates a new Sim_X folder in the given parent_folder, incrementing the number if needed.
+        """
+        max_num_folders = 10
+        
+        # Ensure the parent folder exists
+        os.makedirs(parent_folder, exist_ok=True)
 
-		
+        # List all subdirectories that match "Sim_X"
+        existing_folders = [d for d in os.listdir(parent_folder) if d.startswith("Sim_") and os.path.isdir(os.path.join(parent_folder, d))]
 
-		# Your code here.
-		yourConvergenceTestsHere = False
-		num_iterations = 500
-		iterations = 0
-		while( (yourConvergenceTestsHere is False) and iterations < num_iterations):
-			
-			meanObjective = 0
-			bestObjective = 0.0
-			bestSolution = np.array([1,2,3,4,5])
-			
+        if len(existing_folders) >= max_num_folders:
+            print(f" Folder Limit exceeded!. Deleting all folders in {parent_folder}")
 
-			# Your code here.
+            for folder in existing_folders:
+                folder_path = os.path.join(parent_folder, folder)
+                shutil.rmtree(folder_path)
+                print(f"Deleted folder: {folder_path}")
+      
+        print(f"Number of folders: {len(existing_folders)}")
+        # Extract numbers from folder names
+        existing_numbers = []
+        for folder in existing_folders:
+            try:
+                num = int(folder.split("_")[1])  # Extract number after "Sim_"
+                existing_numbers.append(num)
+            except (IndexError, ValueError):
+                continue  # Skip invalid folder names
 
-			# Call the reporter with:
-			#  - the mean objective function value of the population
-			#  - the best objective function value of the population
-			#  - a 1D numpy array in the cycle notation containing the best solution 
-			#    with city numbering starting from 0
-			
-			timeLeft = self.reporter.report(meanObjective, bestObjective, bestSolution)
-			if timeLeft < 0:
-				break
-			
-		#model.plot_fitness_dynamic()
-		# Your code here.
-		return 0
-	
-	def run_multiple_times(self,filename,mutation_test=True):
-		
-		#make me a mutation prob that goes from 0.001 to 0.08 in steps of 0.001
-		mutations_prob = np.round(np.linspace(0.0,0.08,80))
-		if mutation_test:
-			for mutation_prob in mutations_prob:
-				for i in range(self.num_simulations_to_run):
-					self.optimize(filename,mutation_prob)
+        # Determine next folder name
+        next_number = max(existing_numbers) + 1 if existing_numbers else 1
+        new_folder_name = f"Sim_{next_number}"
+        new_folder_path = os.path.join(parent_folder, new_folder_name)
+
+        # Create the new folder
+        os.makedirs(new_folder_path)
+
+        print(f"Created new simulation folder: {new_folder_path}")
+
+        return new_folder_name
+
+    def delete_sim_folders(self, parent_folder):
+        """
+        - Deletes all Sim_X folders in the given parent_folder.
+        """
+        
+        # Ensure the parent folder exists
+        os.makedirs(parent_folder, exist_ok=True)
+
+        # List all subdirectories that match "Sim_X"
+        existing_folders = [d for d in os.listdir(parent_folder) if d.startswith("Sim_") and os.path.isdir(os.path.join(parent_folder, d))]
+
+        for folder in existing_folders:
+            folder_path = os.path.join(parent_folder, folder)
+            shutil.rmtree(folder_path)
+            print(f"Deleted folder: {folder_path}")
+
+        
 
 		
 	
@@ -403,7 +430,7 @@ class algorithm:
         - Run the city model
         '''
         self.cities_model.generate_distance_matrix()
-        self.cities_model.plot_cities()
+        #self.cities_model.plot_cities()
 
 
     def add_run_cities_model(self):
@@ -501,7 +528,7 @@ class algorithm:
 
             index += 1
 
-        self.plot_ExecutionTime_Clusters()
+        #self.plot_ExecutionTime_Clusters()
 
         # 2) Create and run Higher level GA model
         if clusters:
@@ -2403,7 +2430,7 @@ class r0818807_GA_Level1:
 			
             timeLeft = self.reporter.report(meanObjective, bestObjective, bestSolution)
            
-            if timeLeft < 0:
+            if timeLeft < 290:
                 break
 
             self.check_stoppingCriteria(time_left=timeLeft,limit_stuck=15)
@@ -4854,7 +4881,7 @@ class r0818807_GA_Level1:
     #--------------------------------------------------------------------- 7) Plotting------------------------------------------------------------------------------------------------
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
         
-
+    '''
     def plot_fitness_dynamic(self):
         # Create the first plot for Best and Mean Objective values
         fig_obj = go.Figure()
@@ -5105,9 +5132,321 @@ class r0818807_GA_Level1:
 
         # Show the first plot
         fig_obj.show()
+    '''
 
+
+
+    def plot_fitness_dynamic(self):
+        # Ensure the results_sim_folder exists
+        if not os.path.exists(results_sim_folder):
+            os.makedirs(results_sim_folder)
+
+        # Create the first plot for Best and Mean Objective values
+        fig_obj = go.Figure()
+
+        # Add the best objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(self.best_objective_list))),
+            y=self.best_objective_list,
+            mode='lines+markers',
+            name='Best Objective',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        # Add the second best objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(self.second_best_objective_list))),
+            y=self.second_best_objective_list,
+            mode='lines+markers',
+            name='Second Best Objective',
+            line=dict(color='brown'),
+            marker=dict(symbol='circle')
+        ))
+
+        # Add the mean objective trace
+        fig_obj.add_trace(go.Scatter(
+            x=list(range(len(self.mean_objective_list))),
+            y=self.mean_objective_list,
+            mode='lines+markers',
+            name='Mean Objective',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        # Get the last iteration's best and mean objective values
+        last_best_objective = self.best_objective_list[-1]
+        last_mean_objective = self.mean_objective_list[-1]
+
+        # Add text annotation for the last iteration's objective values
+        fig_obj.add_annotation(
+            x=len(self.best_objective_list) - 1,
+            y=last_best_objective,
+            text=f'Best: {last_best_objective}<br>Mean: {last_mean_objective}',
+            showarrow=True,
+            arrowhead=1,
+            ax=-10,
+            ay=-40,
+            bgcolor='white',
+            bordercolor='black'
+        )
+
+        # Set the title and axis labels for the objective plot
+        fig_obj.update_layout(
+            title=f'Objective Distance over Iterations with mutation rate {self.mutation_rate} % and sigma: {self.sigma} and alpha: {self.alpha}',
+            xaxis_title='Iterations',
+            yaxis_title='Objective Distance',
+            legend=dict(x=0, y=1),
+            hovermode='x',
+            yaxis=dict(
+                type='log',  # Set Y-axis to logarithmic scale
+                autorange=True  # Ensure the axis is adjusted automatically
+            )
+        )
+
+        # Save the first plot as HTML
+        plot_filename = "objective_distance_plot.html"
+        plot_filepath = os.path.join(results_sim_folder, plot_filename)
+        fig_obj.write_html(plot_filepath)
+
+        # Create the second plot for Best and Mean Fitness values
+        fig_fitness = go.Figure()
+
+        # Add the best fitness trace
+        fig_fitness.add_trace(go.Scatter(
+            x=list(range(len(self.best_fitness_list))),
+            y=self.best_fitness_list,
+            mode='lines+markers',
+            name='Best Fitness',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        # Add the mean fitness trace
+        fig_fitness.add_trace(go.Scatter(
+            x=list(range(len(self.mean_fitness_list))),
+            y=self.mean_fitness_list,
+            mode='lines+markers',
+            name='Mean Fitness',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        # Get the last iteration's best and mean fitness values
+        last_best_fitness = self.best_fitness_list[-1]
+        last_mean_fitness = self.mean_fitness_list[-1]
+
+        # Add text annotation for the last iteration's fitness values
+        fig_fitness.add_annotation(
+            x=len(self.best_fitness_list) - 1,
+            y=last_best_fitness,
+            text=f'Best: {last_best_fitness}<br>Mean: {last_mean_fitness}',
+            showarrow=True,
+            arrowhead=1,
+            ax=-10,
+            ay=-40,
+            bgcolor='white',
+            bordercolor='black'
+        )
+
+        # Set the title and axis labels for the fitness plot
+        fig_fitness.update_layout(
+            title=f'Fitness over Iterations with mutation rate {self.mutation_rate*100} %',
+            xaxis_title='Iterations',
+            yaxis_title='Fitness',
+            legend=dict(x=0, y=1),
+            hovermode='x',
+            yaxis=dict(
+                type='log',  # Set Y-axis to logarithmic scale
+                autorange=True  # Ensure the axis is adjusted automatically
+            )
+        )
+
+        # Save the fitness plot as HTML
+        fitness_plot_filename = "fitness_plot.html"
+        fitness_plot_filepath = os.path.join(results_sim_folder, fitness_plot_filename)
+        fig_fitness.write_html(fitness_plot_filepath)
+
+        # Plotting unique solutions
+        fig_unique_solutions = go.Figure()
+
+        # Add the unique solutions trace
+        fig_unique_solutions.add_trace(go.Scatter(
+            x=list(range(len(self.num_unique_solutions_list))),
+            y=self.num_unique_solutions_list,
+            mode='lines+markers',
+            name='Num Unique Solutions',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        # Add the repeated solutions trace
+        fig_unique_solutions.add_trace(go.Scatter(
+            x=list(range(len(self.num_repeated_solutions_list))),
+            y=self.num_repeated_solutions_list,
+            mode='lines+markers',
+            name='Num Repeated Solutions',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        # Set the title and axis labels for the unique solutions plot
+        fig_unique_solutions.update_layout(
+            title=f'Number of Unique and Repeated Solutions over Iterations with mutation rate {self.mutation_rate*100} %',
+            xaxis_title='Iterations',
+            yaxis_title='Number of Solutions',
+            legend=dict(x=0, y=1),
+            hovermode='x'
+        )
+
+        # Save the unique solutions plot as HTML
+        unique_solutions_plot_filename = "unique_solutions_plot.html"
+        unique_solutions_plot_filepath = os.path.join(results_sim_folder, unique_solutions_plot_filename)
+        fig_unique_solutions.write_html(unique_solutions_plot_filepath)
+
+        # Plotting hamming distance
+        fig_hamming = go.Figure()
+
+        # Add the hamming distance traces
+        fig_hamming.add_trace(go.Scatter(
+            x=list(range(len(self.hamming_distance_list))),
+            y=self.hamming_distance_list,
+            mode='lines+markers',
+            name='Hamming distance',
+            line=dict(color='blue'),
+            marker=dict(symbol='circle')
+        ))
+
+        fig_hamming.add_trace(go.Scatter(
+            x=list(range(len(self.hamming_distance_crossover_list))),
+            y=self.hamming_distance_crossover_list,
+            mode='lines+markers',
+            name='Hamming distance crossover',
+            line=dict(color='orange'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_hamming.add_trace(go.Scatter(
+            x=list(range(len(self.hamming_distance_mutation1_list))),
+            y=self.hamming_distance_mutation1_list,
+            mode='lines+markers',
+            name='Hamming distance mutation1',
+            line=dict(color='green'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_hamming.add_trace(go.Scatter(
+            x=list(range(len(self.hamming_distance_mutation2_list))),
+            y=self.hamming_distance_mutation2_list,
+            mode='lines+markers',
+            name='Hamming distance mutation2',
+            line=dict(color='red'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_hamming.add_trace(go.Scatter(
+            x=list(range(len(self.hamming_distance_local_search_list))),
+            y=self.hamming_distance_local_search_list,
+            mode='lines+markers',
+            name='Hamming distance local search',
+            line=dict(color='purple'),
+            marker=dict(symbol='x')
+        ))
+
+        fig_hamming.add_trace(go.Scatter(
+            x=list(range(len(self.hamming_distance_crossoverOld_list))),
+            y=self.hamming_distance_crossoverOld_list,
+            mode='lines+markers',
+            name='Hamming distance crossoverOld',
+            line=dict(color='pink'),
+            marker=dict(symbol='x')
+        ))
+
+        # Set the title and axis labels for the hamming distance plot
+        fig_hamming.update_layout(
+            title=f'Hamming Distance over Iterations with mutation rate {self.mutation_rate*100} %',
+            xaxis_title='Iterations',
+            yaxis_title='Hamming Distance',
+            legend=dict(x=0, y=1),
+            hovermode='x'
+        )
+
+        # Save the hamming distance plot as HTML
+        hamming_plot_filename = "hamming_distance_plot.html"
+        hamming_plot_filepath = os.path.join(results_sim_folder, hamming_plot_filename)
+        fig_hamming.write_html(hamming_plot_filepath)
 
     
+  
+    def plot_timing_info(self):
+        """
+        Plot timing information for each stage of the genetic algorithm over iterations.
+        """
+        # Ensure the results_sim_folder exists
+        if not os.path.exists(results_sim_folder):
+            os.makedirs(results_sim_folder)
+
+        # Create a figure for the timing information
+        fig_time = go.Figure()
+
+        # Add a trace for each timing component
+        timing_labels = [
+            "Initialization", "Selection", "Crossover", "Mutation",
+            "Elimination", "Mutation Population", "Local Search", "Total Iteration"
+        ]
+        timing_lists = [
+            self.time_initialization_list, self.time_selection_list, self.time_crossover_list,
+            self.time_mutation_list, self.time_elimination_list, self.time_mutation_population_list,
+            self.time_local_search_list, self.time_iteration_list
+        ]
+
+        colors = ["blue", "orange", "green", "red", "purple", "brown", "pink", "black"]  # Assign colors to each process
+
+        # Add each timing list to the plot
+        for label, time_list, color in zip(timing_labels, timing_lists, colors):
+            fig_time.add_trace(go.Scatter(
+                x=list(range(len(time_list))),
+                y=time_list,
+                mode='lines+markers',
+                name=label,
+                line=dict(color=color),
+                marker=dict(symbol='circle')
+            ))
+
+        # Add annotations for the last iteration's timing values
+        for i, (label, time_list) in enumerate(zip(timing_labels, timing_lists)):
+            if time_list:  # Ensure the list is not empty
+                fig_time.add_annotation(
+                    x=len(time_list) - 1,
+                    y=time_list[-1],
+                    text=f'{label}: {time_list[-1]:.2f}s',
+                    showarrow=True,
+                    arrowhead=2,
+                    ax=-20 * (i + 1),  # Offset annotations for readability
+                    ay=-40,
+                    bgcolor='white',
+                    bordercolor='black'
+                )
+
+        # Set the title and axis labels for the timing plot
+        fig_time.update_layout(
+            title='Timing Information Over Iterations',
+            xaxis_title='Iterations',
+            yaxis_title='Time (seconds)',
+            legend=dict(x=1, y=1),
+            hovermode='x',
+        )
+
+        # Save the timing plot as HTML
+        timing_plot_filename = "timing_plot.html"
+        timing_plot_filepath = os.path.join(results_sim_folder, timing_plot_filename)
+        fig_time.write_html(timing_plot_filepath)
+
+        # Return the path for the saved plot
+        return timing_plot_filepath
+
+
+    '''
     def plot_timing_info(self):
         """
         Plot timing information for each stage of the genetic algorithm over iterations.
@@ -5165,6 +5504,7 @@ class r0818807_GA_Level1:
 
         # Show the timing plot
         fig_time.show()
+    '''
         
 def calculate_total_distance_individual(route, distance_matrix):
     '''
@@ -7935,26 +8275,29 @@ class cities:
     def plot_clusters(self):
         """
         Plot each cluster with a different color and highlight the medoid.
+        Saves the plot as an image.
         """
         print("\n---------- Plotting Clusters: ------")
+        
+        # Ensure the 'static/plots' directory exists
+        #os.makedirs("static/plots", exist_ok=True)
         
         # Choose a color palette with strong distinctions between colors
         num_clusters = len(self.clusters_list)
         print(f"Number of clusters: {num_clusters}")
+        
         if num_clusters <= 10:
-            colors = sns.color_palette("Dark2", num_clusters)  # 'tab10' has 10 highly distinct colors
+            colors = sns.color_palette("Dark2", num_clusters)  # 'Dark2' palette for up to 10 clusters
         elif num_clusters <= 12:
-            colors = sns.color_palette("Set1", num_clusters)  # 'Set1' has 9 distinct colors but works well for up to 12
+            colors = sns.color_palette("Set1", num_clusters)  # 'Set1' for up to 12 clusters
         else:
-            # For more than 12 clusters, we fall back on the HSV palette with high saturation
-            colors = sns.color_palette("hsv", num_clusters)
+            colors = sns.color_palette("hsv", num_clusters)  # Use 'hsv' for more than 12 clusters
         
         # Create a new figure
         plt.figure(figsize=(10, 8))
         
         # Loop through each cluster and plot the cities
         for i, cluster_info in enumerate(self.clusters_list):
-            # Extract cluster details
             assigned_cities = cluster_info['assigned_cities']
             medoid_index = cluster_info['medoid']
             
@@ -7963,21 +8306,30 @@ class cities:
             y_coords = self.cities[assigned_cities, 1]
             
             # Plot cities in the cluster with a unique color
-            # I want large color distinction between clusters
-
             plt.scatter(x_coords, y_coords, label=f"Cluster {i}", color=colors[i], alpha=0.6)
             
             # Highlight the medoid in each cluster
             medoid_x = self.cities[medoid_index, 0]
             medoid_y = self.cities[medoid_index, 1]
             plt.scatter(medoid_x, medoid_y, color=colors[i], edgecolor="black", s=150, marker="X", label=f"Medoid {i}")
-
-        # Add legend, title, and show plot
+        
+        # Add legend, title, and labels
         plt.title("Clusters with Medoids Highlighted")
         plt.xlabel("X Coordinate")
         plt.ylabel("Y Coordinate")
-        plt.legend()
-        plt.show()
+        
+        # Save the plot to the 'static/plots' folder
+        plot_filename = "cluster_plot.png"
+        print(f"Plotting clusters to: {plot_filename} and saving it to {results_sim_folder}")
+        plot_filepath = os.path.join(results_sim_folder, plot_filename)  # Save the plot to results_sim_folder
+        plt.savefig(plot_filepath)  # Save the plot as an image
+        
+        # Close the plot after saving it to free up memory
+        plt.close()
+
+        print(f"Cluster plot saved to: {plot_filepath}")
+        
+
         
     
     def plot_cities(self):
@@ -8012,9 +8364,12 @@ class cities:
         """
         Plot each cluster with a different color and highlight the medoid.
         Optionally, show the sequence of cities with arrows.
-        Returns the figure object to allow storing and further use.
+        Saves the plot as an image and returns the filename.
         """
         print("\n---------- Plotting Clusters: ------")
+        
+        # Ensure the 'static/plots' directory exists
+        #os.makedirs("static/plots", exist_ok=True)
         
         # Choose a color palette with strong distinctions between colors
         num_clusters = len(self.clusters_list)
@@ -8069,11 +8424,14 @@ class cities:
                 plt.arrow(start_x, start_y, end_x - start_x, end_y - start_y, 
                         head_width=0.03, length_includes_head=True, color="black", alpha=0.8)
         
-        # Add legend, title, and show plot
-        plt.title("Clusters with Medoids and City Sequence")
-        plt.xlabel("X Coordinate")
-        plt.ylabel("Y Coordinate")
-        plt.legend()
-        plt.show()
+        # Save the plot to the 'static/plots' folder
+        plot_filename = "cluster_plot_sequence.png"
+        plot_filepath = os.path.join(results_sim_folder, plot_filename)
+        plt.savefig(plot_filepath)
+
+        print(f"Cluster plot saved to: {plot_filepath}")
+        plt.close()
+        
+
 
 

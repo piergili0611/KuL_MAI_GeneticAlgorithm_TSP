@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genetic Algorithm Simulation</title>
+
+    <!-- Embedded CSS for styling -->
+    <style>
+        /* Global Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #1e1e1e;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #1c1c1c;
+            color: #fff;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.8em;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 25px;
+            background-color: #2c2c2c;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            cursor: pointer;
+            background-color: #34495e;
+            color: #fff;
+            padding: 15px 20px;
+            border-radius: 8px 8px 0 0;
+            justify-content: space-evenly;
+            transition: background-color 0.3s ease;
+        }
+
+        .tabs div {
+            padding: 12px 20px;
+            border-radius: 8px 8px 0 0;
+            font-size: 1.2em;
+            transition: background-color 0.3s ease;
+        }
+
+        .tabs div:hover {
+            background-color: #2d3e50;
+        }
+
+        .tabs .active-tab {
+            background-color: #3498db;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            background-color: #3a3a3a;
+            border-top: 3px solid #3498db;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-section {
+            margin-bottom: 20px;
+        }
+
+        input[type="text"], input[type="checkbox"] {
+            padding: 10px;
+            width: calc(100% - 24px);
+            margin-bottom: 20px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background-color: #3a3a3a;
+            color: #fff;
+            font-size: 1.1em;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Styling for plot titles and frames */
+        .plot-container {
+            margin-top: 30px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .plot-title {
+            font-size: 1.6em;
+            margin-bottom: 15px;
+            color: #3498db;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        iframe {
+            width: 100%;
+            height: 500px;
+            border: none;
+            border-radius: 8px;
+            transition: transform 0.3s ease;
+        }
+
+        iframe:hover {
+            transform: scale(1.05);
+        }
+
+        .results-section {
+            background-color: #2c2c2c;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .plot-container {
+            background-color: #333;
+        }
+
+        .form-section label {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* Styling for responsiveness */
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tabs div {
+                margin-bottom: 10px;
+            }
+
+            .container {
+                width: 100%;
+                padding: 15px;
+            }
+
+            iframe {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Genetic Algorithm Simulation</h1>
+</header>
+
+<div class="container">
+    <!-- Tabs for input and results -->
+    <div class="tabs">
+        <div onclick="showTab('inputTab')" class="active-tab">Input</div>
+        <div onclick="showTab('resultsTab')">Results</div>
+    </div>
+
+    <!-- Input Tab -->
+    <div id="inputTab" class="tab-content active">
+        <form method="post">
+            <div class="form-section">
+                <label for="filename">Enter Filename:</label>
+                <input type="text" name="filename" value="tour50.csv" required>
+            </div>
+
+            <div class="form-section">
+                <label for="clusters">Use Clustering:</label>
+                <input type="checkbox" name="clusters">
+
+                <label for="local_search">Enable Local Search:</label>
+                <input type="checkbox" name="local_search">
+
+                <label for="Generate Data Sets">Generate Data Sets:</label>
+                <input type="checkbox" name="generate_data_sets">
+            </div>
+
+            <button type="submit">Run Simulation</button>
+        </form>
+    </div>
+
+    <!-- Results Tab -->
+    <div id="resultsTab" class="tab-content">
+        {% if plot_urls %}
+            <div class="results-section">
+                <h2>Results</h2>
+                
+                {% for plot_url in plot_urls %}
+                    <div class="plot-container">
+                        <div class="Fitness Plot">Plot {{ loop.index }}</div>
+                        <iframe src="{{ plot_url }}"></iframe>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p style="color: #ccc;">No plots generated yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function showTab(tabId) {
+        // Hide all tabs
+        const tabs = document.querySelectorAll('.tab-content');
+        tabs.forEach(tab => tab.classList.remove('active'));
+
+        // Show the selected tab
+        document.getElementById(tabId).classList.add('active');
+
+        // Toggle the active tab class
+        const tabLinks = document.querySelectorAll('.tabs div');
+        tabLinks.forEach(tab => tab.classList.remove('active-tab'));
+        document.querySelector(`.tabs div[onclick="showTab('${tabId}')"]`).classList.add('active-tab');
+    }
+</script>
+
+</body>
+</html>
