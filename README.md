@@ -15,10 +15,10 @@ This project implements a **Genetic Algorithm (GA) to solve the Traveling Salesm
 ## Upcoming Features 🚀
 
 💻 **Online Dashboard (Work in Progress!)**  
-- Run simulations directly from a web interface.![TSP Example](Images_text/GA_Dashboard1_InputPanel)
+- Run simulations directly from a web interface.![TSP Example](Images_text/GA_Dashboard1_InputPanel.png)
 
 - Choose different configurations: **apply local search, enable clustering, adjust parameters**.  
-- Get **interactive plots** and detailed simulation results.  
+- Get **interactive plots** and detailed simulation results. ![TSP Example](Images_text/GA_Dashboard2_Results1.png)  
 
 ## Installation
 
